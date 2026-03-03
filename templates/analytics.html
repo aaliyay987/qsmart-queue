@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Analytics & Reports{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- SUMMARY STATS -->
+<div class="row g-4 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon pink"><i class="bi bi-people-fill" style="color:var(--pink)"></i></div>
+      <div class="stat-value">{{ total_customers }}</div>
+      <div class="stat-label">Total Customers</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="bi bi-ticket-perforated" style="color:#1B8A45"></i></div>
+      <div class="stat-value">{{ total_tokens }}</div>
+      <div class="stat-label">Tokens Issued</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon orange"><i class="bi bi-currency-rupee" style="color:#C77800"></i></div>
+      <div class="stat-value">₹{{ "%.0f"|format(total_revenue) }}</div>
+      <div class="stat-label">Total Revenue</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="bi bi-calendar-check" style="color:#1A56DB"></i></div>
+      <div class="stat-value">{{ total_appointments }}</div>
+      <div class="stat-label">Total Appointments</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- DAILY TOKENS CHART -->
+  <div class="col-lg-7">
+    <div class="form-card">
+      <h6 style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:20px">
+        Token Issuance — Last 7 Days
+      </h6>
+      <canvas id="tokenChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- SERVICE BREAKDOWN -->
+  <div class="col-lg-5">
+    <div class="form-card">
+      <h6 style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:20px">Service Popularity</h6>
+      <canvas id="serviceChart" height="200"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- TOP CUSTOMERS -->
+<div class="row g-4 mt-2">
+  <div class="col-lg-6">
+    <div class="data-table">
+      <div class="p-4 border-bottom" style="border-color:#f0eaf5">
+        <h6 style="font-family:'Syne',sans-serif;font-weight:700;margin:0">Top Customers by Visits</h6>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr><th>Customer</th><th>Phone</th><th>Visits</th></tr>
+          </thead>
+          <tbody>
+            {% for c in top_customers %}
+            <tr>
+              <td><strong>{{ c.name }}</strong></td>
+              <td style="color:var(--text-sub)">{{ c.phone }}</td>
+              <td><span class="badge rounded-pill" style="background:var(--pink-light);color:var(--pink)">{{ c.visits }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No data yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="data-table">
+      <div class="p-4 border-bottom" style="border-color:#f0eaf5">
+        <h6 style="font-family:'Syne',sans-serif;font-weight:700;margin:0">Staff Performance</h6>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr><th>Staff</th><th>Appointments</th></tr>
+          </thead>
+          <tbody>
+            {% for st in staff_performance %}
+            <tr>
+              <td><strong>{{ st.name }}</strong></td>
+              <td><span class="badge rounded-pill" style="background:#E8F0FF;color:#1A56DB">{{ st.appointments|length }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-center text-muted py-3">No staff data yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Token chart
+  const tokenCtx = document.getElementById('tokenChart');
+  new Chart(tokenCtx, {
+    type: 'bar',
+    data: {
+      labels: {{ labels|tojson }},
+      datasets: [{
+        label: 'Tokens Issued',
+        data: {{ token_data|tojson }},
+        backgroundColor: 'rgba(255,45,107,0.15)',
+        borderColor: '#FF2D6B',
+        borderWidth: 2,
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f5f0fa' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Service pie chart
+  const svcCtx = document.getElementById('serviceChart');
+  new Chart(svcCtx, {
+    type: 'doughnut',
+    data: {
+      labels: {{ service_labels|tojson }},
+      datasets: [{
+        data: {{ service_data|tojson }},
+        backgroundColor: ['#FF2D6B','#FF6B9D','#FFB3CC','#FFD6E7','#FF8FB3','#C0392B'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      cutout: '65%'
+    }
+  });
+</script>
+{% endblock %}

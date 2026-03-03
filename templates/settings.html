@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - QSmart{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="container">
+        <div class="dashboard-header">
+            <h1>⚙️ Settings</h1>
+            <p style="color: var(--text-light); font-size: 18px;">
+                Manage your account settings and preferences
+            </p>
+        </div>
+
+        <div class="row">
+            <!-- Profile Settings -->
+            <div class="col-6 col-sm-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>👤 Profile Settings</h3>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('settings') }}">
+                            <input type="hidden" name="action" value="update_profile">
+                            
+                            <div class="form-group">
+                                <label for="name">Business Name</label>
+                                <input 
+                                    type="text" 
+                                    id="name" 
+                                    name="name" 
+                                    value="{{ current_user.name }}"
+                                    required
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="email">Email Address</label>
+                                <input 
+                                    type="email" 
+                                    id="email" 
+                                    name="email" 
+                                    value="{{ current_user.owner_email }}"
+                                    required
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label>Subdomain</label>
+                                <input 
+                                    type="text" 
+                                    value="{{ current_user.subdomain }}.qsmart.com"
+                                    disabled
+                                    style="background: var(--gray-50); cursor: not-allowed;"
+                                >
+                                <small style="color: var(--text-muted); font-size: 13px;">
+                                    Subdomain cannot be changed
+                                </small>
+                            </div>
+
+                            <button type="submit" class="btn btn-pink">
+                                💾 Save Changes
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Change Password -->
+            <div class="col-6 col-sm-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🔐 Change Password</h3>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('settings') }}">
+                            <input type="hidden" name="action" value="change_password">
+                            
+                            <div class="form-group">
+                                <label for="current_password">Current Password</label>
+                                <input 
+                                    type="password" 
+                                    id="current_password" 
+                                    name="current_password" 
+                                    placeholder="••••••••"
+                                    required
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="new_password">New Password</label>
+                                <input 
+                                    type="password" 
+                                    id="new_password" 
+                                    name="new_password" 
+                                    placeholder="••••••••"
+                                    minlength="6"
+                                    required
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="confirm_password">Confirm New Password</label>
+                                <input 
+                                    type="password" 
+                                    id="confirm_password" 
+                                    name="confirm_password" 
+                                    placeholder="••••••••"
+                                    minlength="6"
+                                    required
+                                >
+                            </div>
+
+                            <button type="submit" class="btn btn-pink">
+                                🔒 Update Password
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="row" style="margin-top: 40px;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📊 Account Information</h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px;">
+                            <div>
+                                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 4px;">Business Name</p>
+                                <p style="font-weight: 600; font-size: 16px;">{{ current_user.name }}</p>
+                            </div>
+
+                            <div>
+                                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 4px;">Subdomain</p>
+                                <p style="font-weight: 600; font-size: 16px;">
+                                    <code style="background: var(--gray-100); padding: 4px 8px; border-radius: 4px;">
+                                        {{ current_user.subdomain }}.qsmart.com
+                                    </code>
+                                </p>
+                            </div>
+
+                            <div>
+                                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 4px;">Email</p>
+                                <p style="font-weight: 600; font-size: 16px;">{{ current_user.owner_email }}</p>
+                            </div>
+
+                            <div>
+                                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 4px;">Account Status</p>
+                                <p>
+                                    {% if current_user.approved %}
+                                        <span class="badge badge-success">✅ Approved</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">⏳ Pending Approval</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="row" style="margin-top: 40px;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🔗 Quick Links</h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                            <a href="{{ url_for('walkin', subdomain=current_user.subdomain) }}" 
+                               target="_blank"
+                               class="btn btn-secondary btn-block">
+                                🎫 Walk-in Page
+                            </a>
+
+                            <a href="{{ url_for('book', subdomain=current_user.subdomain) }}" 
+                               target="_blank"
+                               class="btn btn-secondary btn-block">
+                                📅 Booking Page
+                            </a>
+
+                            <a href="{{ url_for('generate_qr') }}" 
+                               class="btn btn-secondary btn-block">
+                                📱 Download QR Code
+                            </a>
+
+                            <a href="{{ url_for('analytics') }}" 
+                               class="btn btn-secondary btn-block">
+                                📊 View Analytics
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="row" style="margin-top: 40px;">
+            <div class="col-12">
+                <div class="card" style="border: 2px solid #EF4444;">
+                    <div class="card-header" style="background: #FEF2F2;">
+                        <h3 style="color: #EF4444;">⚠️ Danger Zone</h3>
+                    </div>
+                    <div class="card-body">
+                        <p style="color: var(--text-light); margin-bottom: 16px;">
+                            Need to delete your account? Please contact support at 
+                            <a href="mailto:support@qsmart.com" style="color: var(--pink-primary); font-weight: 600;">
+                                support@qsmart.com
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

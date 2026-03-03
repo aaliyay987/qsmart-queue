@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Book Appointment - {{ tenant.name }}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --pink: #FF2D6B;
+  --border: rgba(255,45,107,0.15);
+  --radius: 20px;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #fff;
+  padding: 120px 20px;
+}
+
+.card {
+  max-width: 600px;
+  margin: auto;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 40px;
+}
+
+h1 { font-family: 'Syne', sans-serif; }
+
+input, select {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+button {
+  width: 100%;
+  padding: 14px;
+  border-radius: 50px;
+  border: none;
+  background: var(--pink);
+  color: white;
+  font-weight: 700;
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+<h1>📅 Book Appointment</h1>
+<h2>{{ tenant.name }}</h2>
+
+<form method="POST">
+<input type="text" name="name" placeholder="Your Name" required>
+<input type="tel" name="phone" placeholder="Phone" required>
+
+<select name="service_id" required>
+<option value="">Select service</option>
+{% for service in services %}
+<option value="{{ service.id }}">{{ service.name }} - ₹{{ service.price }}</option>
+{% endfor %}
+</select>
+
+<input type="datetime-local" name="time" required>
+
+<button type="submit">Book Appointment</button>
+</form>
+
+</div>
+</body>
+</html>

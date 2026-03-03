@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Demo — QSmart Queue Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet"/>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    :root { --pink:#FF2D6B; --pink-light:#FFE0EC; --pink-pale:#FFF5F9; --dark:#0D0A0F; }
+    * { box-sizing:border-box; }
+    body { font-family:'DM Sans',sans-serif; background:#F8F5FF; margin:0; }
+    h1,h2,h3,h4,h5 { font-family:'Syne',sans-serif; }
+
+    .topbar { background:var(--dark); padding:14px 32px; display:flex; align-items:center; justify-content:space-between; }
+    .topbar-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; color:#fff; text-decoration:none; display:flex; align-items:center; gap:8px; }
+    .topbar-logo .logo-icon { background:var(--pink); width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.9rem; }
+    .topbar-logo span { color:var(--pink); }
+    .demo-banner { background:linear-gradient(135deg,var(--pink),#FF8FB3); color:#fff; text-align:center; padding:10px 24px; font-size:0.85rem; font-weight:600; }
+    .demo-banner a { color:#fff; text-decoration:underline; }
+
+    .container-custom { max-width:1100px; margin:0 auto; padding:32px 24px; }
+
+    .demo-hero { text-align:center; margin-bottom:40px; }
+    .demo-hero h1 { font-size:2.2rem; font-weight:800; margin-bottom:10px; }
+    .demo-hero h1 span { color:var(--pink); }
+    .demo-hero p { color:#6B5B72; max-width:500px; margin:0 auto; }
+
+    .business-select { background:#fff; border-radius:20px; padding:28px; border:1px solid #f0eaf5; margin-bottom:32px; }
+    .business-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+    .biz-card { border:2px solid #e8e0f0; border-radius:14px; padding:18px; text-align:center; cursor:pointer; transition:all 0.2s; }
+    .biz-card:hover, .biz-card.selected { border-color:var(--pink); background:var(--pink-pale); }
+    .biz-card.selected { box-shadow:0 0 0 3px rgba(255,45,107,0.15); }
+    .biz-icon { font-size:2rem; margin-bottom:8px; }
+    .biz-name { font-weight:700; font-size:0.88rem; color:var(--dark); }
+
+    /* DEMO DASHBOARD */
+    .demo-dash { display:none; }
+    .demo-dash.active { display:block; }
+
+    .dash-header { background:var(--dark); border-radius:16px; padding:20px 24px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; color:#fff; }
+    .dash-shop-name { font-family:'Syne',sans-serif; font-weight:800; font-size:1.2rem; }
+    .dash-shop-meta { font-size:0.78rem; color:rgba(255,255,255,0.5); }
+
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+    .stat-card { background:#fff; border-radius:14px; padding:18px; border:1px solid #f0eaf5; }
+    .stat-value { font-family:'Syne',sans-serif; font-size:1.8rem; font-weight:800; color:var(--dark); }
+    .stat-label { font-size:0.75rem; color:#6B5B72; text-transform:uppercase; letter-spacing:0.06em; margin-top:4px; }
+
+    .queue-area { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .panel { background:#fff; border-radius:16px; overflow:hidden; border:1px solid #f0eaf5; }
+    .panel-header { padding:16px 20px; border-bottom:1px solid #f5f0fa; display:flex; justify-content:space-between; align-items:center; }
+    .panel-header h5 { margin:0; font-size:0.95rem; font-family:'Syne',sans-serif; }
+    .panel-body { padding:16px; }
+
+    .token-input-row { display:flex; gap:8px; margin-bottom:16px; }
+    .token-input-row input { flex:1; border:1.5px solid #e8e0f0; border-radius:10px; padding:10px 14px; font-size:0.88rem; }
+    .token-input-row input:focus { border-color:var(--pink); outline:none; }
+    .btn-sm-pink { background:var(--pink); color:#fff; border:none; border-radius:8px; padding:10px 16px; font-weight:700; font-size:0.8rem; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+    .btn-sm-pink:hover { background:#e0265e; }
+
+    .queue-list { display:flex; flex-direction:column; gap:8px; max-height:320px; overflow-y:auto; }
+    .queue-row { display:flex; align-items:center; gap:10px; background:#fafafa; border-radius:10px; padding:10px 12px; border:1px solid #f0eaf5; }
+    .queue-row .token { background:var(--pink); color:#fff; font-family:'Syne',sans-serif; font-weight:800; font-size:0.75rem; padding:5px 10px; border-radius:8px; white-space:nowrap; }
+    .queue-row .cname { flex:1; font-weight:600; font-size:0.85rem; }
+    .queue-row .cwait { font-size:0.75rem; color:#6B5B72; }
+    .queue-row .act-btns { display:flex; gap:4px; }
+    .act-btn { border:none; border-radius:6px; padding:5px 10px; font-size:0.72rem; font-weight:700; cursor:pointer; transition:all 0.15s; }
+    .act-start { background:#E8FFF0; color:#1B8A45; }
+    .act-complete { background:#E8F0FF; color:#1A56DB; }
+    .act-cancel { background:#FFE8E8; color:#C0392B; }
+    .status-badge { font-size:0.68rem; font-weight:700; padding:3px 8px; border-radius:50px; }
+    .s-waiting { background:var(--pink-light); color:var(--pink); }
+    .s-serving { background:#E8FFF0; color:#1B8A45; }
+    .s-done { background:#E8F0FF; color:#1A56DB; }
+
+    .customer-form { display:flex; flex-direction:column; gap:10px; }
+    .form-inp { border:1.5px solid #e8e0f0; border-radius:10px; padding:10px 14px; font-size:0.88rem; width:100%; }
+    .form-inp:focus { border-color:var(--pink); outline:none; }
+    .btn-full-pink { background:var(--pink); color:#fff; border:none; border-radius:50px; padding:12px; font-weight:700; width:100%; font-size:0.9rem; cursor:pointer; }
+    .btn-full-pink:hover { background:#e0265e; }
+
+    /* Customer view panel */
+    .cust-token-display { background:linear-gradient(135deg,var(--pink),#FF8FB3); border-radius:16px; padding:24px; color:#fff; text-align:center; margin-bottom:14px; }
+    .cust-token-num { font-family:'Syne',sans-serif; font-weight:800; font-size:2.5rem; }
+    .cust-pos { font-size:0.85rem; opacity:0.8; }
+
+    .live-badge { display:inline-flex; align-items:center; gap:5px; background:#E8FFF0; color:#1B8A45; font-size:0.7rem; font-weight:700; padding:4px 10px; border-radius:50px; }
+    .live-dot { width:6px; height:6px; border-radius:50%; background:#27C93F; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+    .log-panel { background:var(--dark); border-radius:14px; padding:16px; margin-top:20px; font-family:monospace; font-size:0.78rem; color:rgba(255,255,255,0.6); max-height:140px; overflow-y:auto; }
+    .log-entry { padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .log-entry .ts { color:rgba(255,255,255,0.3); }
+    .log-entry .msg { color:#27C93F; }
+    .log-entry .evt { color:#FF2D6B; }
+
+    @media(max-width:768px) {
+      .stats-row { grid-template-columns:1fr 1fr; }
+      .queue-area { grid-template-columns:1fr; }
+      .business-cards { grid-template-columns:1fr 1fr; }
+    }
+    @media(max-width:500px) {
+      .stats-row { grid-template-columns:1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="{{ url_for('home') }}" class="topbar-logo">
+    <div class="logo-icon">⚡</div>Q<span>Smart</span>
+  </a>
+  <div style="display:flex;gap:12px;align-items:center">
+    <a href="{{ url_for('login') }}" style="color:rgba(255,255,255,0.6);text-decoration:none;font-size:0.88rem">Login</a>
+    <a href="{{ url_for('signup') }}" style="background:var(--pink);color:#fff;text-decoration:none;padding:8px 20px;border-radius:50px;font-weight:700;font-size:0.85rem">Sign Up Free</a>
+      
+    <a href="{{ url_for('home') }}" style="color:rgba(255,255,255,0.6);text-decoration:none;font-size:0.88rem" class="back-home-btn"><i class="bi bi-house"></i> Back to Home</a>
+  </div>
+</div>
+
+<div class="demo-banner">
+  🎭 This is an interactive demo — no login required! Try adding customers and managing the queue.
+  <a href="{{ url_for('signup') }}">Create your real account →</a>
+</div>
+
+<div class="container-custom">
+  <div class="demo-hero">
+    <h1>Try QSmart <span>Live Demo</span></h1>
+    <p>Select a business type below and experience how QSmart manages queues and appointments in real time.</p>
+  </div>
+
+  <!-- BUSINESS SELECTOR -->
+  <div class="business-select">
+    <h5 style="margin-bottom:16px">Choose your business type to demo:</h5>
+    <div class="business-cards">
+      <div class="biz-card selected" onclick="selectBiz(this,'Sharma Salon','💇','salon')">
+        <div class="biz-icon">💇</div>
+        <div class="biz-name">Salon</div>
+      </div>
+      <div class="biz-card" onclick="selectBiz(this,'Dr. Mehta Clinic','🏥','clinic')">
+        <div class="biz-icon">🏥</div>
+        <div class="biz-name">Clinic</div>
+      </div>
+      <div class="biz-card" onclick="selectBiz(this,'Speed Auto Repair','🔧','auto_repair')">
+        <div class="biz-icon">🔧</div>
+        <div class="biz-name">Auto Repair</div>
+      </div>
+      <div class="biz-card" onclick="selectBiz(this,'Bright Coaching','📚','coaching')">
+        <div class="biz-icon">📚</div>
+        <div class="biz-name">Coaching</div>
+      </div>
+      <div class="biz-card" onclick="selectBiz(this,'Patel Pharmacy','💊','pharmacy')">
+        <div class="biz-icon">💊</div>
+        <div class="biz-name">Pharmacy</div>
+      </div>
+      <div class="biz-card" onclick="selectBiz(this,'Joshi CA Office','📋','ca_office')">
+        <div class="biz-icon">📋</div>
+        <div class="biz-name">CA Office</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEMO DASHBOARD -->
+  <div class="demo-dash active" id="demo-dashboard">
+    <div class="dash-header">
+      <div>
+        <div class="dash-shop-name" id="biz-name-display">Sharma Salon</div>
+        <div class="dash-shop-meta" id="biz-type-display">💇 Salon · Demo Mode</div>
+      </div>
+      <div class="live-badge"><span class="live-dot"></span> Live Queue</div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-queue">0</div>
+        <div class="stat-label">In Queue</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-served">0</div>
+        <div class="stat-label">Served Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-wait">—</div>
+        <div class="stat-label">Avg Wait</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-revenue">₹0</div>
+        <div class="stat-label">Revenue</div>
+      </div>
+    </div>
+
+    <div class="queue-area">
+      <!-- OWNER VIEW -->
+      <div class="panel">
+        <div class="panel-header">
+          <h5>👨‍💼 Owner View — Queue Control</h5>
+          <span style="font-size:0.75rem;color:#6B5B72">Business owner's screen</span>
+        </div>
+        <div class="panel-body">
+          <div class="queue-list" id="owner-queue-list">
+            <div style="text-align:center;color:#6B5B72;font-size:0.85rem;padding:24px">
+              Queue is empty. Add customers from the Customer View →
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CUSTOMER VIEW -->
+      <div class="panel">
+        <div class="panel-header">
+          <h5>📱 Customer View — Join Queue</h5>
+          <span style="font-size:0.75rem;color:#6B5B72">What customers see on their phone</span>
+        </div>
+        <div class="panel-body">
+          <div id="cust-form-view">
+            <div class="customer-form">
+              <input class="form-inp" id="cust-name" placeholder="Your name" />
+              <input class="form-inp" id="cust-phone" placeholder="Mobile number" type="tel"/>
+              <select class="form-inp" id="cust-service">
+                <option value="haircut|200|20">Haircut — ₹200 (20 min)</option>
+                <option value="color|800|60">Hair Color — ₹800 (60 min)</option>
+                <option value="facial|500|45">Facial — ₹500 (45 min)</option>
+                <option value="massage|600|40">Head Massage — ₹600 (40 min)</option>
+              </select>
+              <button class="btn-full-pink" onclick="joinQueue()">🎟️ Get My Token</button>
+            </div>
+          </div>
+          <div id="cust-token-view" style="display:none">
+            <div class="cust-token-display">
+              <div style="font-size:0.8rem;opacity:0.75;margin-bottom:6px">YOUR TOKEN</div>
+              <div class="cust-token-num" id="my-token">—</div>
+              <div class="cust-pos" id="my-position">Position #1 · ~15 min wait</div>
+            </div>
+            <div id="my-status" style="text-align:center;font-weight:600;color:var(--pink);font-size:0.9rem;margin-bottom:14px">
+              ⏳ Waiting in queue...
+            </div>
+            <button class="btn-full-pink" style="background:#E8F0FF;color:#1A56DB;margin-top:4px" onclick="resetCustView()">
+              Join Queue Again
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIVITY LOG -->
+    <div class="log-panel" id="activity-log">
+      <div class="log-entry"><span class="ts">[System]</span> <span class="msg">QSmart Demo initialized. Ready for action!</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Demo State
+  let queue = [];
+  let served = 0;
+  let totalRevenue = 0;
+  let tokenCounter = 1;
+  let bizName = 'Sharma Salon';
+  let bizIcon = '💇';
+  let myQueueId = null;
+  const services = {
+    salon: [
+      {val:'haircut|200|20',name:'Haircut',price:200,dur:20},
+      {val:'color|800|60',name:'Hair Color',price:800,dur:60},
+      {val:'facial|500|45',name:'Facial',price:500,dur:45},
+    ],
+    clinic: [
+      {val:'consult|300|15',name:'Consultation',price:300,dur:15},
+      {val:'followup|150|10',name:'Follow-up',price:150,dur:10},
+      {val:'test|500|30',name:'Blood Test',price:500,dur:30},
+    ],
+    auto_repair: [
+      {val:'service|800|60',name:'Full Service',price:800,dur:60},
+      {val:'oil|200|20',name:'Oil Change',price:200,dur:20},
+      {val:'wash|150|15',name:'Car Wash',price:150,dur:15},
+    ],
+    coaching: [
+      {val:'session|500|60',name:'1-hr Session',price:500,dur:60},
+      {val:'doubt|200|30',name:'Doubt Class',price:200,dur:30},
+    ],
+    pharmacy: [
+      {val:'prescription|50|5',name:'Prescription',price:50,dur:5},
+      {val:'otc|100|5',name:'OTC Medicine',price:100,dur:5},
+    ],
+    ca_office: [
+      {val:'gst|1000|45',name:'GST Filing',price:1000,dur:45},
+      {val:'itr|1500|60',name:'ITR Filing',price:1500,dur:60},
+      {val:'consult|500|30',name:'Consultation',price:500,dur:30},
+    ],
+  };
+
+  function selectBiz(el, name, icon, type) {
+    document.querySelectorAll('.biz-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    bizName = name;
+    bizIcon = icon;
+    document.getElementById('biz-name-display').textContent = name;
+    document.getElementById('biz-type-display').textContent = icon + ' ' + type.replace('_',' ') + ' · Demo Mode';
+    // Update service select
+    const sel = document.getElementById('cust-service');
+    sel.innerHTML = '';
+    (services[type]||services.salon).forEach(s => {
+      sel.innerHTML += `<option value="${s.val}">${s.name} — ₹${s.price} (${s.dur} min)</option>`;
+    });
+    queue = [];
+    served = 0;
+    totalRevenue = 0;
+    tokenCounter = 1;
+    myQueueId = null;
+    renderQueue();
+    updateStats();
+    log('Business changed to: ' + name, 'evt');
+    resetCustView();
+  }
+
+  function getToken() {
+    const prefix = bizName.split(' ')[0].substring(0,2).toUpperCase();
+    return prefix + String(tokenCounter++).padStart(2,'0');
+  }
+
+  function joinQueue() {
+    const name = document.getElementById('cust-name').value.trim();
+    const phone = document.getElementById('cust-phone').value.trim();
+    const svcVal = document.getElementById('cust-service').value;
+    const svcParts = svcVal.split('|');
+
+    if (!name) { alert('Please enter your name'); return; }
+    if (!phone) { alert('Please enter your mobile number'); return; }
+
+    const token = getToken();
+    const position = queue.filter(q => q.status === 'waiting').length + 1;
+    const item = {
+      id: Date.now(),
+      token, name, phone,
+      service: svcParts[0],
+      price: parseInt(svcParts[1]),
+      dur: parseInt(svcParts[2]),
+      status: 'waiting',
+      position,
+      wait: position * parseInt(svcParts[2])
+    };
+    queue.push(item);
+    myQueueId = item.id;
+
+    // Show customer token view
+    document.getElementById('cust-form-view').style.display = 'none';
+    document.getElementById('cust-token-view').style.display = 'block';
+    document.getElementById('my-token').textContent = token;
+    document.getElementById('my-position').textContent = `Position #${position} · ~${item.wait} min wait`;
+    document.getElementById('my-status').innerHTML = '⏳ Waiting in queue...';
+
+    renderQueue();
+    updateStats();
+    log(`New customer joined: ${name} → Token ${token}`, 'msg');
+  }
+
+  function startService(id) {
+    const item = queue.find(q => q.id === id);
+    if (item) {
+      item.status = 'serving';
+      if (myQueueId === id) {
+        document.getElementById('my-status').innerHTML = '🎉 It\'s your turn! Please proceed to the counter.';
+        document.getElementById('my-status').style.color = '#1B8A45';
+      }
+      renderQueue();
+      updateStats();
+      log(`Started service: ${item.name} (${item.token})`, 'evt');
+    }
+  }
+
+  function completeService(id) {
+    const item = queue.find(q => q.id === id);
+    if (item) {
+      item.status = 'done';
+      served++;
+      totalRevenue += item.price;
+      if (myQueueId === id) {
+        document.getElementById('my-status').innerHTML = '✅ Service completed! Thank you for visiting.';
+        document.getElementById('my-status').style.color = '#1A56DB';
+      }
+      renderQueue();
+      updateStats();
+      log(`Completed: ${item.name} — ₹${item.price} earned`, 'msg');
+    }
+  }
+
+  function cancelToken(id) {
+    const item = queue.find(q => q.id === id);
+    if (item) {
+      item.status = 'cancelled';
+      if (myQueueId === id) {
+        document.getElementById('my-status').innerHTML = '❌ Your token was cancelled.';
+        document.getElementById('my-status').style.color = '#C0392B';
+      }
+      renderQueue();
+      updateStats();
+      log(`Cancelled: ${item.name} (${item.token})`, 'evt');
+    }
+  }
+
+  function renderQueue() {
+    const activeQueue = queue.filter(q => q.status !== 'cancelled' && q.status !== 'done');
+    const list = document.getElementById('owner-queue-list');
+
+    if (activeQueue.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:#6B5B72;font-size:0.85rem;padding:24px">Queue is empty.</div>';
+      return;
+    }
+
+    list.innerHTML = activeQueue.map((item,i) => `
+      <div class="queue-row">
+        <div class="token">${item.token}</div>
+        <div class="cname">${item.name}
+          <div style="font-size:0.72rem;color:#6B5B72">${item.service} · ~${item.dur}min</div>
+        </div>
+        <span class="status-badge ${item.status==='serving'?'s-serving':'s-waiting'}">${item.status==='serving'?'Serving':'Waiting'}</span>
+        <div class="act-btns">
+          ${item.status==='waiting' ? `<button class="act-btn act-start" onclick="startService(${item.id})">▶</button>` : ''}
+          ${item.status==='serving' ? `<button class="act-btn act-complete" onclick="completeService(${item.id})">✓</button>` : ''}
+          <button class="act-btn act-cancel" onclick="cancelToken(${item.id})">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function updateStats() {
+    const activeQ = queue.filter(q => q.status === 'waiting' || q.status === 'serving');
+    document.getElementById('stat-queue').textContent = activeQ.length;
+    document.getElementById('stat-served').textContent = served;
+    document.getElementById('stat-wait').textContent = activeQ.length ? '~' + activeQ[0].dur + 'm' : '—';
+    document.getElementById('stat-revenue').textContent = '₹' + totalRevenue;
+
+    // Update customer position
+    if (myQueueId) {
+      const myItem = queue.find(q => q.id === myQueueId);
+      if (myItem && myItem.status === 'waiting') {
+        const pos = queue.filter(q => (q.status==='waiting'||q.status==='serving') && q.id <= myItem.id).length;
+        document.getElementById('my-position').textContent = `Position #${pos} · ~${pos * myItem.dur} min wait`;
+      }
+    }
+  }
+
+  function resetCustView() {
+    myQueueId = null;
+    document.getElementById('cust-form-view').style.display = 'block';
+    document.getElementById('cust-token-view').style.display = 'none';
+    document.getElementById('cust-name').value = '';
+    document.getElementById('cust-phone').value = '';
+    document.getElementById('my-status').style.color = 'var(--pink)';
+  }
+
+  function log(msg, type='msg') {
+    const logEl = document.getElementById('activity-log');
+    const now = new Date().toLocaleTimeString('en-IN');
+    logEl.innerHTML += `<div class="log-entry"><span class="ts">[${now}]</span> <span class="${type}">${msg}</span></div>`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+</script>
+</body>
+</html>

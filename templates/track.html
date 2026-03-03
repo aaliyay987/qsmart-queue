@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Track Token - {{ tenant.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family:Arial; padding:40px; background:#fff0f5;">
+
+<h1>📍 Track Your Token</h1>
+<h2>{{ tenant.name }}</h2>
+
+<div style="background:white; padding:30px; border-radius:10px; max-width:500px;">
+
+    <h3>🎟 Token: {{ queue.token }}</h3>
+    <p>Status: <strong>{{ queue.status }}</strong></p>
+    <p>Current Position: <strong>{{ current_position }}</strong></p>
+    <p>Estimated Wait: <strong>{{ estimated_wait }} minutes</strong></p>
+
+</div>
+
+<br>
+
+<a href="{{ url_for('home') }}">Back to Home</a>
+
+</body>
+</html>

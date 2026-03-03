@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Staff{% endblock %}
+{% block page_title %}Staff Management{% endblock %}
+
+{% block content %}
+<style>
+    /* LARGER FONTS FOR DASHBOARD */
+    .dashboard h1 {
+        font-size: 42px !important;
+    }
+    .dashboard p, .dashboard td, .dashboard th, .dashboard label {
+        font-size: 17px !important;
+    }
+    .card-header h3 {
+        font-size: 24px !important;
+    }
+    .stat-card h3 {
+        font-size: 16px !important;
+    }
+    .stat-value {
+        font-size: 40px !important;
+    }
+    .btn {
+        font-size: 16px !important;
+    }
+</style>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <p class="text-muted mb-0">{{ staff|length }} staff members registered</p>
+  <button class="btn btn-pink" data-bs-toggle="modal" data-bs-target="#addStaffModal">
+    <i class="bi bi-person-plus-fill"></i> Add Staff
+  </button>
+</div>
+
+<div class="row g-4">
+  {% for st in staff %}
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--pink),var(--pink-mid));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.2rem;font-family:'Syne',sans-serif">
+          {{ st.name[0].upper() }}
+        </div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem">{{ st.name }}</div>
+          <div style="font-size:0.78rem;color:var(--text-sub)">Staff Member</div>
+        </div>
+        <div class="ms-auto">
+          <form method="POST" action="{{ url_for('delete_staff', id=st.id) }}" onsubmit="return confirm('Remove this staff member?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius:50px"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      </div>
+      {% if st.schedule %}
+      <div class="p-2 rounded-2" style="background:var(--pink-pale);font-size:0.8rem;color:var(--text-sub)">
+        <i class="bi bi-clock"></i> {{ st.schedule }}
+      </div>
+      {% endif %}
+      <div class="mt-3 d-flex gap-3">
+        <div>
+          <div style="font-size:0.72rem;color:var(--text-sub)">Appointments</div>
+          <div style="font-weight:700;color:var(--dark)">{{ st.appointments|length }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12 text-center py-5 text-muted">
+    <i class="bi bi-person-badge" style="font-size:3rem;opacity:0.25"></i>
+    <p class="mt-3">No staff members yet. Add your first team member!</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ADD STAFF MODAL -->
+<div class="modal fade" id="addStaffModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Staff Member</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('add_staff') }}">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Full Name</label>
+            <input class="form-control" name="name" placeholder="Staff member name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Work Schedule</label>
+            <input class="form-control" name="schedule" placeholder="e.g. Mon-Sat 9AM-6PM">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-pink">Add Staff</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

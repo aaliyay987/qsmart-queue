@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Appointments - {{ current_user.name }}{% endblock %}
+
+{% block content %}
+<style>
+    /* LARGER FONTS FOR DASHBOARD */
+    .dashboard h1 {
+        font-size: 42px !important;
+    }
+    .dashboard p, .dashboard td, .dashboard th, .dashboard label {
+        font-size: 17px !important;
+    }
+    .card-header h3 {
+        font-size: 24px !important;
+    }
+    .stat-card h3 {
+        font-size: 16px !important;
+    }
+    .stat-value {
+        font-size: 40px !important;
+    }
+    .btn {
+        font-size: 16px !important;
+    }
+</style>
+
+<div class="dashboard">
+    <div class="container">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <h1>📅 Customer Appointments</h1>
+            <p style="color: var(--text-light); font-size: 19px;">
+                View and manage all customer appointments
+            </p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <h3>Scheduled</h3>
+                <div class="stat-value">{{ scheduled_count }}</div>
+                <div class="stat-change">Upcoming appointments</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>Completed</h3>
+                <div class="stat-value">{{ completed_count }}</div>
+                <div class="stat-change positive">Total completed</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>Cancelled</h3>
+                <div class="stat-value">{{ cancelled_count }}</div>
+                <div class="stat-change">Cancelled appointments</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>Total</h3>
+                <div class="stat-value">{{ appointments|length }}</div>
+                <div class="stat-change">All appointments</div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="row" style="margin-bottom: 30px;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <a href="{{ url_for('appointments') }}" 
+                           class="btn {% if not request.args.get('status') %}btn-pink{% else %}btn-secondary{% endif %}">
+                            All Appointments
+                        </a>
+                        <a href="{{ url_for('appointments', status='scheduled') }}" 
+                           class="btn {% if request.args.get('status') == 'scheduled' %}btn-pink{% else %}btn-secondary{% endif %}">
+                            📅 Scheduled
+                        </a>
+                        <a href="{{ url_for('appointments', status='completed') }}" 
+                           class="btn {% if request.args.get('status') == 'completed' %}btn-pink{% else %}btn-secondary{% endif %}">
+                            ✅ Completed
+                        </a>
+                        <a href="{{ url_for('appointments', status='cancelled') }}" 
+                           class="btn {% if request.args.get('status') == 'cancelled' %}btn-pink{% else %}btn-secondary{% endif %}">
+                            ❌ Cancelled
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Appointments Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>All Appointments ({{ appointments|length }})</h3>
+                    </div>
+                    <div class="card-body">
+                        {% if appointments %}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date & Time</th>
+                                            <th>Customer</th>
+                                            <th>Phone</th>
+                                            <th>Service</th>
+                                            <th>Staff</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for apt in appointments %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ apt.time.strftime('%d %b %Y') }}</strong><br>
+                                                <span style="color: var(--text-muted); font-size: 15px;">
+                                                    {{ apt.time.strftime('%I:%M %p') }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <strong>{{ apt.customer.name }}</strong>
+                                            </td>
+                                            <td>{{ apt.customer_phone }}</td>
+                                            <td>
+                                                {% if apt.service %}
+                                                    {{ apt.service.name }}<br>
+                                                    <span style="color: var(--text-muted); font-size: 15px;">
+                                                        {{ apt.service.duration }} min - ₹{{ apt.service.price }}
+                                                    </span>
+                                                {% else %}
+                                                    <span style="color: var(--text-muted);">No service</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if apt.staff %}
+                                                    {{ apt.staff.name }}
+                                                {% else %}
+                                                    <span style="color: var(--text-muted);">Any staff</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if apt.status == 'scheduled' %}
+                                                    <span class="badge badge-warning">📅 Scheduled</span>
+                                                {% elif apt.status == 'completed' %}
+                                                    <span class="badge badge-success">✅ Completed</span>
+                                                {% elif apt.status == 'cancelled' %}
+                                                    <span class="badge badge-danger">❌ Cancelled</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if apt.status == 'scheduled' %}
+                                                    <a href="{{ url_for('complete_appointment', id=apt.id) }}" 
+                                                       class="btn btn-sm btn-success"
+                                                       onclick="return confirm('Mark as completed?')">
+                                                        Complete
+                                                    </a>
+                                                    <a href="{{ url_for('cancel_appointment', id=apt.id) }}" 
+                                                       class="btn btn-sm btn-danger"
+                                                       onclick="return confirm('Cancel this appointment?')">
+                                                        Cancel
+                                                    </a>
+                                                {% else %}
+                                                    <span style="color: var(--text-muted); font-size: 15px;">No actions</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+                                <p style="font-size: 64px; margin-bottom: 20px;">📅</p>
+                                <h3 style="font-size: 24px; margin-bottom: 12px;">No Appointments Yet</h3>
+                                <p style="font-size: 17px; margin-bottom: 24px;">
+                                    Customers can book appointments through the search page
+                                </p>
+                                <a href="{{ url_for('search_business') }}" class="btn btn-pink" target="_blank">
+                                    View Search Page
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="row" style="margin-top: 40px;">
+            <div class="col-12">
+                <div class="card" style="background: var(--pink-pale); border: none;">
+                    <div class="card-body" style="padding: 32px;">
+                        <h3 style="font-size: 22px; margin-bottom: 16px;">ℹ️ How Appointments Work</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-top: 24px;">
+                            <div style="background: white; padding: 20px; border-radius: var(--radius-md);">
+                                <div style="font-size: 32px; margin-bottom: 12px;">1️⃣</div>
+                                <strong style="display: block; margin-bottom: 8px; font-size: 18px;">Customer Books</strong>
+                                <p style="color: var(--text-light); font-size: 16px; margin: 0;">
+                                    Customers find your business via search and book appointments
+                                </p>
+                            </div>
+                            
+                            <div style="background: white; padding: 20px; border-radius: var(--radius-md);">
+                                <div style="font-size: 32px; margin-bottom: 12px;">2️⃣</div>
+                                <strong style="display: block; margin-bottom: 8px; font-size: 18px;">You Review</strong>
+                                <p style="color: var(--text-light); font-size: 16px; margin: 0;">
+                                    Check appointment details and prepare for the customer
+                                </p>
+                            </div>
+                            
+                            <div style="background: white; padding: 20px; border-radius: var(--radius-md);">
+                                <div style="font-size: 32px; margin-bottom: 12px;">3️⃣</div>
+                                <strong style="display: block; margin-bottom: 8px; font-size: 18px;">Mark Complete</strong>
+                                <p style="color: var(--text-light); font-size: 16px; margin: 0;">
+                                    After service, mark the appointment as completed
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

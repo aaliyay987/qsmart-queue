@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Live Queue{% endblock %}
+{% block page_title %}Live Queue Management{% endblock %}
+
+{% block content %}
+<style>
+    /* LARGER FONTS FOR DASHBOARD */
+    .dashboard h1 {
+        font-size: 42px !important;
+    }
+    .dashboard p, .dashboard td, .dashboard th, .dashboard label {
+        font-size: 17px !important;
+    }
+    .card-header h3 {
+        font-size: 24px !important;
+    }
+    .stat-card h3 {
+        font-size: 16px !important;
+    }
+    .stat-value {
+        font-size: 40px !important;
+    }
+    .btn {
+        font-size: 16px !important;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <p class="text-muted mb-0" style="font-size:0.9rem">Real-time token management for your business</p>
+  </div>
+  <div class="d-flex gap-2">
+    <span class="live-badge"><span class="live-dot"></span> {{ queues|length }} Active</span>
+    <a href="{{ url_for('walkin', subdomain=current_user.subdomain) }}" target="_blank" class="btn btn-pink">
+      <i class="bi bi-plus-lg"></i> Issue Token
+    </a>
+  </div>
+</div>
+
+<!-- QUEUE STATS -->
+<div class="row g-3 mb-4">
+  {% set waiting_count = queues|selectattr('status','eq','waiting')|list|length %}
+  {% set serving_count = queues|selectattr('status','eq','in_progress')|list|length %}
+  <div class="col-4">
+    <div class="stat-card text-center py-3">
+      <div class="stat-value" style="color:var(--pink)">{{ waiting_count }}</div>
+      <div class="stat-label">Waiting</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="stat-card text-center py-3">
+      <div class="stat-value" style="color:#1B8A45">{{ serving_count }}</div>
+      <div class="stat-label">In Service</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="stat-card text-center py-3">
+      <div class="stat-value" style="color:#C77800">{{ queues|length * 15 }}</div>
+      <div class="stat-label">Max Wait (min)</div>
+    </div>
+  </div>
+</div>
+
+<!-- FULL QUEUE TABLE -->
+<div class="data-table">
+  <div class="p-4 border-bottom d-flex justify-content-between align-items-center" style="border-color:#f0eaf5">
+    <h5 class="mb-0" style="font-family:'Syne',sans-serif">All Queue Tokens</h5>
+    <small class="text-muted">Updates live via WebSocket</small>
+  </div>
+  {% if queues %}
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Service</th>
+          <th>Position</th>
+          <th>Est. Wait</th>
+          <th>Status</th>
+          <th>Joined At</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="queue-tbody">
+        {% for q in queues %}
+        <tr id="tr-{{ q.id }}">
+          <td><span class="token-pill" style="display:inline-block">{{ q.token }}</span></td>
+          <td><strong>{{ q.customer.name }}</strong></td>
+          <td><i class="bi bi-phone" style="color:var(--text-sub)"></i> {{ q.customer_phone }}</td>
+          <td>{{ q.service.name if q.service else '—' }}</td>
+          <td><span class="badge rounded-pill" style="background:var(--pink-light);color:var(--pink)">#{{ q.position }}</span></td>
+          <td>~{{ q.estimated_wait }} min</td>
+          <td>
+            <span class="status-badge {{ 'badge-serving' if q.status == 'in_progress' else 'badge-waiting' }}">
+              {{ 'Serving' if q.status == 'in_progress' else 'Waiting' }}
+            </span>
+          </td>
+          <td style="color:var(--text-sub);font-size:0.8rem">{{ q.created_at.strftime('%I:%M %p') }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              {% if q.status == 'waiting' %}
+              <a href="{{ url_for('start_service', id=q.id) }}" class="btn btn-sm btn-pink" title="Start">
+                <i class="bi bi-play-fill"></i>
+              </a>
+              {% elif q.status == 'in_progress' %}
+              <a href="{{ url_for('complete_service', id=q.id) }}" class="btn btn-sm btn-success" style="border-radius:50px" title="Complete">
+                <i class="bi bi-check-lg"></i>
+              </a>
+              {% endif %}
+              <a href="{{ url_for('cancel_queue', id=q.id) }}" class="btn btn-sm btn-outline-danger" style="border-radius:50px" title="Cancel">
+                <i class="bi bi-x-lg"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-ticket-perforated" style="font-size:3rem;opacity:0.25"></i>
+    <p class="mt-3">Queue is empty right now</p>
+    <a href="{{ url_for('walkin', subdomain=current_user.subdomain) }}" target="_blank" class="btn btn-pink">
+      <i class="bi bi-plus-lg"></i> Issue First Token
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const socket = io();
+  socket.on('queue_update', function(data) {
+    // Could add real-time row highlighting here
+    console.log('Update:', data);
+  });
+</script>
+{% endblock %}

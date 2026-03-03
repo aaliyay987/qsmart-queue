@@ -1,0 +1,1410 @@
+app.py
+# app.py - Q-SMART Main Application
+
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+from flask_bcrypt import Bcrypt
+from flask_login import (
+    LoginManager, login_user, logout_user,
+    current_user, login_required
+)
+import requests
+from io import BytesIO
+import qrcode
+import random
+from datetime import datetime
+
+from config import Config
+from extensions import db, migrate, socketio
+from models import Tenant, Service, Staff, Appointment, Queue, Customer
+from sockets import init_socket_events
+
+# -------------------------------------------------
+# App setup
+# -------------------------------------------------
+app = Flask(__name__)
+app.config.from_object(Config)
+
+# Initialize extensions
+db.init_app(app)
+migrate.init_app(app, db)
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+socketio.init_app(app, cors_allowed_origins="*")
+
+# Register SocketIO events
+init_socket_events()
+
+# -------------------------------------------------
+# Login loader
+# -------------------------------------------------
+@login_manager.user_loader
+def load_user(user_id):
+    return Tenant.query.get(int(user_id))
+
+# -------------------------------------------------
+# WhatsApp Notification
+# -------------------------------------------------
+def send_whatsapp(phone, message):
+    print(f"[WHATSAPP] Sending to {phone}: {message}")
+    # Uncomment when ready:
+    # url = "https://graph.facebook.com/v18.0/YOUR_PHONE_ID/messages"
+    # data = {"messaging_product": "whatsapp", "to": phone, "text": {"body": message}}
+    # headers = {"Authorization": "Bearer YOUR_TOKEN"}
+    # requests.post(url, json=data, headers=headers)
+
+# -------------------------------------------------
+# Home / Landing Page
+# -------------------------------------------------
+@app.route('/')
+def home():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return render_template('landing.html')  # Use landing.html, NOT base.html
+
+# -------------------------------------------------
+# Signup - New Business Registration
+# -------------------------------------------------
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        phone = request.form.get('phone', '')
+        business_type = request.form.get('business_type', 'salon')
+        password = bcrypt.generate_password_hash(request.form['password']).decode('utf-8')
+        
+        # Create unique subdomain from business name
+        subdomain = name.lower().replace(" ", "-").replace("'", "")
+        
+        # Check if email already exists
+        existing = Tenant.query.filter_by(owner_email=email).first()
+        if existing:
+            flash("Email already registered. Please login.", "warning")
+            return redirect(url_for('login'))
+
+        tenant = Tenant(
+            name=name,
+            subdomain=subdomain,
+            owner_email=email,
+            password_hash=password,
+            approved=True  # Auto-approve for now, set False for manual approval
+        )
+        db.session.add(tenant)
+        db.session.commit()
+        
+        flash(f"🎉 Welcome to US-BOP, {name}! Your account is ready.", "success")
+        return redirect(url_for('login'))
+
+    return render_template('signup.html')
+
+# -------------------------------------------------
+# Login
+# -------------------------------------------------
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        tenant = Tenant.query.filter_by(owner_email=email).first()
+        
+        if tenant and bcrypt.check_password_hash(tenant.password_hash, password):
+            if not tenant.approved:
+                flash("Your account is pending approval. Please wait.", "warning")
+                return redirect(url_for('login'))
+            
+            login_user(tenant)
+            flash(f"Welcome back, {tenant.name}!", "success")
+            return redirect(url_for('dashboard'))
+        
+        flash("Invalid email or password", "danger")
+
+    return render_template('login.html')
+
+# -------------------------------------------------
+# Logout
+# -------------------------------------------------
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash("Logged out successfully", "info")
+    return redirect(url_for('home'))
+
+# -------------------------------------------------
+# Dashboard
+# -------------------------------------------------
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    services = Service.query.filter_by(tenant_id=current_user.id).all()
+    staff = Staff.query.filter_by(tenant_id=current_user.id).all()
+    queues = Queue.query.filter_by(tenant_id=current_user.id).filter(
+        Queue.status.in_(['waiting', 'in_progress'])
+    ).all()
+    
+    # Calculate today's earnings
+    today_appointments = Appointment.query.filter_by(
+        tenant_id=current_user.id,
+        status='completed'
+    ).filter(
+        db.func.date(Appointment.time) == datetime.utcnow().date()
+    ).all()
+    
+    earnings = sum([apt.service.price for apt in today_appointments if apt.service])
+    
+    return render_template(
+        'dashboard.html',
+        services=services,
+        staff=staff,
+        queues=queues,
+        earnings=earnings
+    )
+
+# -------------------------------------------------
+# Add Service
+# -------------------------------------------------
+@app.route('/add_service', methods=['GET', 'POST'])
+@login_required
+def add_service():
+    if request.method == 'POST':
+        service = Service(
+            name=request.form['name'],
+            duration=int(request.form['duration']),
+            price=float(request.form['price']),
+            tenant_id=current_user.id
+        )
+        db.session.add(service)
+        db.session.commit()
+        flash(f"✅ Service '{service.name}' added successfully!", "success")
+        return redirect(url_for('dashboard'))
+    return render_template('add_service.html')
+
+# -------------------------------------------------
+# Add Staff
+# -------------------------------------------------
+@app.route('/add_staff', methods=['GET', 'POST'])
+@login_required
+def add_staff():
+    if request.method == 'POST':
+        staff = Staff(
+            name=request.form['name'],
+            phone=request.form.get('phone', ''),
+            schedule=request.form.get('schedule', ''),
+            tenant_id=current_user.id
+        )
+        db.session.add(staff)
+        db.session.commit()
+        flash(f"✅ Staff member '{staff.name}' added successfully!", "success")
+        return redirect(url_for('dashboard'))
+    return render_template('add_staff.html')
+
+# -------------------------------------------------
+# Book Appointment (Customer side)
+# -------------------------------------------------
+@app.route('/book/<subdomain>', methods=['GET', 'POST'])
+def book(subdomain):
+    tenant = Tenant.query.filter_by(subdomain=subdomain).first_or_404()
+    services = Service.query.filter_by(tenant_id=tenant.id).all()
+    staff = Staff.query.filter_by(tenant_id=tenant.id).all()
+    
+    if request.method == 'POST':
+        # Get or create customer
+        phone = request.form['phone']
+        customer = Customer.query.filter_by(phone=phone, tenant_id=tenant.id).first()
+        
+        if not customer:
+            customer = Customer(
+                name=request.form['name'],
+                phone=phone,
+                tenant_id=tenant.id
+            )
+            db.session.add(customer)
+            db.session.commit()
+
+        appointment = Appointment(
+            customer_id=customer.id,
+            service_id=request.form['service_id'],
+            staff_id=request.form.get('staff_id'),
+            customer_phone=phone,
+            tenant_id=tenant.id,
+            time=datetime.fromisoformat(request.form['time'])
+        )
+        db.session.add(appointment)
+        db.session.commit()
+        
+        send_whatsapp(
+            customer.phone, 
+            f"✅ Appointment booked at {tenant.name} for {appointment.service.name}"
+        )
+        flash(f"🎉 Appointment booked successfully! Confirmation sent to {phone}", "success")
+        return redirect(url_for('book', subdomain=subdomain))
+
+    return render_template('book.html', tenant=tenant, services=services, staff=staff)
+
+# -------------------------------------------------
+# Walk-in
+# -------------------------------------------------
+@app.route('/walkin/<subdomain>', methods=['GET', 'POST'])
+def walkin(subdomain):
+    tenant = Tenant.query.filter_by(subdomain=subdomain).first_or_404()
+    services = Service.query.filter_by(tenant_id=tenant.id).all()
+    
+    if request.method == 'POST':
+        phone = request.form['phone']
+        customer = Customer.query.filter_by(phone=phone, tenant_id=tenant.id).first()
+        
+        if not customer:
+            customer = Customer(
+                name=request.form.get('name', 'Walk-in Customer'),
+                phone=phone,
+                tenant_id=tenant.id
+            )
+            db.session.add(customer)
+            db.session.commit()
+
+        # Generate token
+        token = f"{tenant.name[:3].upper()}{random.randint(100, 999)}"
+        
+        # Get current queue position
+        current_queues = Queue.query.filter_by(
+            tenant_id=tenant.id, 
+            status='waiting'
+        ).count()
+        
+        queue = Queue(
+            customer_id=customer.id,
+            customer_phone=phone,
+            service_id=request.form.get('service_id'),
+            tenant_id=tenant.id,
+            token=token,
+            position=current_queues + 1,
+            estimated_wait=(current_queues + 1) * 15,  # 15 mins per person
+            status="waiting"
+        )
+        db.session.add(queue)
+        db.session.commit()
+        
+        send_whatsapp(
+            customer.phone, 
+            f"🎫 Token {token} at {tenant.name}. Position: {queue.position}. Wait: ~{queue.estimated_wait} mins"
+        )
+        return redirect(url_for('track_queue', id=queue.id))
+
+    return render_template('walkin.html', tenant=tenant, services=services)
+
+# -------------------------------------------------
+# Track Queue
+# -------------------------------------------------
+@app.route('/track/<int:id>')
+def track_queue(id):
+    queue = Queue.query.get_or_404(id)
+    return render_template('track.html', queue=queue)
+
+# -------------------------------------------------
+# Start / Complete Service
+# -------------------------------------------------
+@app.route('/start_service/<int:id>')
+@login_required
+def start_service(id):
+    queue = Queue.query.get_or_404(id)
+    if queue.tenant_id == current_user.id:
+        queue.status = "in_progress"
+        db.session.commit()
+        socketio.emit('queue_update', {'queue_id': id, 'status': 'in_progress'})
+    return redirect(url_for('dashboard'))
+
+@app.route('/complete_service/<int:id>')
+@login_required
+def complete_service(id):
+    queue = Queue.query.get_or_404(id)
+    if queue.tenant_id == current_user.id:
+        queue.status = "completed"
+        db.session.commit()
+        
+        # Update customer visits
+        customer = Customer.query.get(queue.customer_id)
+        if customer:
+            customer.visits += 1
+            db.session.commit()
+        
+        socketio.emit('queue_update', {'queue_id': id, 'status': 'completed'})
+        flash(f"✅ Service completed for token {queue.token}", "success")
+    return redirect(url_for('dashboard'))
+
+# -------------------------------------------------
+# Generate QR Code for Walk-in
+# -------------------------------------------------
+@app.route('/dashboard/generate_qr')
+@login_required
+def generate_qr():
+    walkin_url = url_for('walkin', subdomain=current_user.subdomain, _external=True)
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(walkin_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    img_io = BytesIO()
+    img.save(img_io, 'PNG')
+    img_io.seek(0)
+    return send_file(
+        img_io,
+        mimetype='image/png',
+        as_attachment=True,
+        download_name=f'{current_user.subdomain}-walkin-qr.png'
+    )
+
+# -------------------------------------------------
+# Admin Panel
+# -------------------------------------------------
+@app.route('/admin')
+@login_required
+def admin_panel():
+    if not current_user.is_admin:
+        flash("Access denied", "danger")
+        return redirect(url_for('dashboard'))
+    
+    tenants = Tenant.query.all()
+    return render_template('admin.html', tenants=tenants)
+
+@app.route('/admin/approve/<int:tenant_id>')
+@login_required
+def approve_tenant(tenant_id):
+    if not current_user.is_admin:
+        flash("Access denied", "danger")
+        return redirect(url_for('dashboard'))
+    
+    tenant = Tenant.query.get_or_404(tenant_id)
+    tenant.approved = True
+    db.session.commit()
+    flash(f"✅ {tenant.name} approved!", "success")
+    return redirect(url_for('admin_panel'))
+
+# -------------------------------------------------
+# Run App
+# -------------------------------------------------
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()  # Create tables if they don't exist
+    
+    socketio.run(
+        app,
+        debug=True,
+        port=5002,
+        allow_unsafe_werkzeug=True
+    )
+
+
+
+
+config.py
+# config.py - Configuration for QSmart Flask app
+
+import os
+
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'super-secret-key-please-change-this-in-production'
+    
+    # Use your REAL Supabase/Neon PostgreSQL URL here!
+    # Example from Supabase: postgresql://postgres:[YOUR_PASSWORD]@db.yourprojectref.supabase.co:5432/postgres
+    SQLALCHEMY_DATABASE_URI = ('postgresql://postgres:WaffleMumbai%2105@db.pmkzhxkptbngpseddwof.supabase.co:5432/postgres')
+    
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    print("Loaded DB URI from config:", SQLALCHEMY_DATABASE_URI)
+
+
+
+extensions.py
+# extensions.py
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_socketio import SocketIO
+
+db = SQLAlchemy()
+migrate = Migrate()
+socketio = SocketIO()
+
+
+models.py
+# models.py
+from extensions import db
+from flask_login import UserMixin
+
+class Tenant(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True)
+    subdomain = db.Column(db.String(50), unique=True)
+    owner_email = db.Column(db.String(120), unique=True)
+    password_hash = db.Column(db.String(128))
+    approved = db.Column(db.Boolean, default=False)
+    is_admin = db.Column(db.Boolean, default=False)
+
+class Service(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'))
+    name = db.Column(db.String(100))
+    duration = db.Column(db.Integer)
+    price = db.Column(db.Float)
+
+class Staff(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'))
+    name = db.Column(db.String(100))
+    schedule = db.Column(db.String(200))  # JSON string
+
+class Appointment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'))
+    service_id = db.Column(db.Integer, db.ForeignKey('service.id'))
+    staff_id = db.Column(db.Integer, db.ForeignKey('staff.id'))
+    customer_phone = db.Column(db.String(20))
+    time = db.Column(db.DateTime)
+    status = db.Column(db.String(20), default='booked')
+
+class Queue(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'))
+    service_id = db.Column(db.Integer, db.ForeignKey('service.id'))
+    token = db.Column(db.String(10))
+    position = db.Column(db.Integer)
+    estimated_wait = db.Column(db.Integer)
+    status = db.Column(db.String(20), default='waiting')
+    customer_phone = db.Column(db.String(20))
+
+class Customer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenant.id'))
+    phone = db.Column(db.String(20), unique=True)
+    visits = db.Column(db.Integer, default=0)
+
+
+
+routes.py
+from flask import render_template, request, redirect, url_for
+from flask_login import LoginManager, login_user, current_user
+from app import app, db
+from models import Tenant
+from flask_bcrypt import Bcrypt
+
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        password = bcrypt.generate_password_hash(request.form['password'])
+        subdomain = name.lower().replace(' ', '')  # Auto-generate
+        tenant = Tenant(name=name, subdomain=subdomain, owner_email=email, password_hash=password)
+        db.session.add(tenant)
+        db.session.commit()
+        return redirect(url_for('login'))
+    return render_template('signup.html')
+
+# Add login route similarly
+
+sockets.py
+# sockets.py
+from flask_socketio import join_room, emit
+from extensions import socketio
+
+def init_socket_events():
+    @socketio.on('connect')
+    def handle_connect():
+        print('Client connected')
+
+    @socketio.on('join')
+    def on_join(data):
+        subdomain = data['subdomain']
+        join_room(subdomain)
+        print(f"Joined room: {subdomain}")
+
+# Call this in app.py after socketio.init_app()
+
+
+
+
+
+templates
+login.html
+<!-- templates/login.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Login</h2>
+<form method="POST">
+    <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" class="form-control">
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Login</button>
+</form>
+{% endblock %}
+
+signup.html
+<!-- templates/signup.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Business Signup</h2>
+<form method="POST">
+    <div class="form-group">
+        <label>Name</label>
+        <input type="text" name="name" class="form-control">
+    </div>
+    <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" class="form-control">
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Signup</button>
+</form>
+{% endblock %}
+
+landing.html
+{% extends "base.html" %}
+
+{% block title %}Q-SMART - Smart Business Operations{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary: #6366f1;
+        --secondary: #8b5cf6;
+        --success: #10b981;
+        --dark: #1e293b;
+    }
+    
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+    }
+    
+    .hero {
+        padding: 100px 0;
+        color: white;
+        text-align: center;
+    }
+    
+    .hero h1 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 1.5rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .hero p {
+        font-size: 1.3rem;
+        opacity: 0.95;
+        max-width: 800px;
+        margin: 0 auto 2rem;
+    }
+    
+    .cta-buttons {
+        margin-top: 2rem;
+    }
+    
+    .btn-primary-custom {
+        background: white;
+        color: var(--primary);
+        padding: 15px 40px;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 1.1rem;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-primary-custom:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        color: var(--primary);
+    }
+    
+    .btn-secondary-custom {
+        background: transparent;
+        color: white;
+        padding: 15px 40px;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 1.1rem;
+        border: 2px solid white;
+        transition: all 0.3s;
+        margin-left: 1rem;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-secondary-custom:hover {
+        background: white;
+        color: var(--primary);
+    }
+    
+    .features {
+        background: white;
+        padding: 80px 0;
+    }
+    
+    .feature-card {
+        padding: 2rem;
+        border-radius: 15px;
+        background: white;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        transition: all 0.3s;
+        height: 100%;
+        border: 2px solid #f1f5f9;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        border-color: var(--primary);
+    }
+    
+    .feature-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 15px;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: white;
+        margin-bottom: 1.5rem;
+    }
+    
+    .stats {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 60px 0;
+    }
+    
+    .stat-item {
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 3rem;
+        font-weight: 800;
+    }
+    
+    .stat-label {
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="hero">
+    <div class="container">
+        <h1>🚀 Q-SMART</h1>
+        <p>Unified Smart Business Operations Platform</p>
+        <p class="lead">AI-Powered All-in-One System for Salons, Clinics & Small Shops</p>
+        <div class="cta-buttons">
+            <a href="{{ url_for('signup') }}" class="btn-primary-custom">
+                <i class="fas fa-rocket me-2"></i>Start Free Trial
+            </a>
+            <a href="{{ url_for('login') }}" class="btn-secondary-custom">
+                <i class="fas fa-sign-in-alt me-2"></i>Login
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="features">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Everything You Need in One Platform</h2>
+            <p class="text-muted">No more juggling multiple tools. One system for everything.</p>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <h4>Smart Booking</h4>
+                    <p class="text-muted">Online appointments with auto-scheduling, staff assignment, and calendar sync. Customers book 24/7.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-qrcode"></i>
+                    </div>
+                    <h4>Digital Queue</h4>
+                    <p class="text-muted">QR-based walk-in tokens. Live position tracking on WhatsApp. No more standing in line!</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <h4>AI Marketing</h4>
+                    <p class="text-muted">Auto re-booking offers, birthday discounts, "we miss you" messages. Even creates Instagram posts!</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h4>Smart CRM</h4>
+                    <p class="text-muted">Track every customer, their visits, preferences, loyalty points. Know who's at risk of leaving.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h4>Analytics</h4>
+                    <p class="text-muted">Daily earnings, peak hours, best staff, top services. Make data-driven decisions.</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-whatsapp"></i>
+                    </div>
+                    <h4>WhatsApp Integration</h4>
+                    <p class="text-muted">Automated notifications, reminders, queue updates. Everything on customer's favorite app.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Section -->
+<div class="stats">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-item">
+                    <div class="stat-number">20-30%</div>
+                    <div class="stat-label">Revenue Increase</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-item">
+                    <div class="stat-number">Zero</div>
+                    <div class="stat-label">Extra Effort</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-item">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">Booking Available</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">India-Focused</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CTA Section -->
+<div class="features text-center">
+    <div class="container">
+        <h2 class="fw-bold mb-4">Ready to Transform Your Business?</h2>
+        <p class="text-muted mb-4">Join hundreds of businesses already using Q-SMART</p>
+        <a href="{{ url_for('signup') }}" class="btn btn-primary btn-lg px-5 py-3">
+            <i class="fas fa-rocket me-2"></i>Get Started Now - It's Free!
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+
+dashboar.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Q-SMART</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+        
+        body {
+            background: #f8fafc;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .navbar {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+        
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+        
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: white;
+            margin-bottom: 15px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #1e293b;
+        }
+        
+        .stat-label {
+            color: #64748b;
+            font-size: 0.95rem;
+        }
+        
+        .section-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .btn-custom {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+        }
+        
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        
+        .service-item, .staff-item, .queue-item {
+            background: #f8fafc;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        
+        .service-item:hover, .staff-item:hover, .queue-item:hover {
+            background: #e2e8f0;
+            transform: translateX(5px);
+        }
+        
+        .badge-custom {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        
+        .status-waiting {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-in-progress {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                🚀 Q-SMART
+            </a>
+            <div class="d-flex align-items-center">
+                <span class="me-3 text-muted">
+                    <i class="fas fa-user-circle me-2"></i>{{ current_user.name }}
+                </span>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">
+                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Stats Row -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+                        <i class="fas fa-rupee-sign"></i>
+                    </div>
+                    <div class="stat-value">₹{{ "%.2f"|format(earnings) }}</div>
+                    <div class="stat-label">Today's Earnings</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-value">{{ queues|length }}</div>
+                    <div class="stat-label">Active Queue</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                        <i class="fas fa-concierge-bell"></i>
+                    </div>
+                    <div class="stat-value">{{ services|length }}</div>
+                    <div class="stat-label">Services</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <div class="stat-value">{{ staff|length }}</div>
+                    <div class="stat-label">Staff Members</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="section-card">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="fas fa-bolt me-2 text-warning"></i>Quick Actions
+                </h3>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <a href="{{ url_for('add_service') }}" class="btn btn-primary-custom w-100">
+                        <i class="fas fa-plus me-2"></i>Add Service
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('add_staff') }}" class="btn btn-primary-custom w-100">
+                        <i class="fas fa-user-plus me-2"></i>Add Staff
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('walkin', subdomain=current_user.subdomain) }}" class="btn btn-primary-custom w-100">
+                        <i class="fas fa-ticket-alt me-2"></i>Walk-in Token
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('generate_qr') }}" class="btn btn-primary-custom w-100">
+                        <i class="fas fa-qrcode me-2"></i>Generate QR
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Queue -->
+        <div class="section-card">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="fas fa-list-ol me-2 text-primary"></i>Live Queue
+                </h3>
+            </div>
+            {% if queues %}
+                <div id="queue-list">
+                    {% for q in queues %}
+                        <div class="queue-item">
+                            <div>
+                                <strong>Token: {{ q.token }}</strong><br>
+                                <small class="text-muted">Position: {{ q.position }} | Wait: ~{{ q.estimated_wait }} mins</small>
+                            </div>
+                            <div>
+                                <span class="badge-custom status-{{ q.status }}">{{ q.status|title }}</span>
+                                {% if q.status == 'waiting' %}
+                                    <a href="{{ url_for('start_service', id=q.id) }}" class="btn btn-sm btn-success ms-2">
+                                        <i class="fas fa-play"></i> Start
+                                    </a>
+                                {% elif q.status == 'in_progress' %}
+                                    <a href="{{ url_for('complete_service', id=q.id) }}" class="btn btn-sm btn-primary ms-2">
+                                        <i class="fas fa-check"></i> Complete
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <p>No customers in queue</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="row">
+            <!-- Services -->
+            <div class="col-md-6">
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3 class="section-title">
+                            <i class="fas fa-concierge-bell me-2 text-warning"></i>Services
+                        </h3>
+                    </div>
+                    {% if services %}
+                        {% for s in services %}
+                            <div class="service-item">
+                                <div>
+                                    <strong>{{ s.name }}</strong><br>
+                                    <small class="text-muted">{{ s.duration }} mins • ₹{{ s.price }}</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-concierge-bell"></i>
+                            <p>No services added yet</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Staff -->
+            <div class="col-md-6">
+                <div class="section-card">
+                    <div class="section-header">
+                        <h3 class="section-title">
+                            <i class="fas fa-user-tie me-2 text-purple"></i>Staff
+                        </h3>
+                    </div>
+                    {% if staff %}
+                        {% for s in staff %}
+                            <div class="staff-item">
+                                <div>
+                                    <strong>{{ s.name }}</strong><br>
+                                    <small class="text-muted">{{ s.phone or 'No phone' }}</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-user-tie"></i>
+                            <p>No staff added yet</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Booking Link -->
+        <div class="section-card bg-primary text-white">
+            <h4><i class="fas fa-link me-2"></i>Your Booking Page</h4>
+            <p class="mb-2">Share this link with your customers:</p>
+            <div class="input-group">
+                <input type="text" class="form-control" id="bookingLink" 
+                       value="{{ url_for('book', subdomain=current_user.subdomain, _external=True) }}" readonly>
+                <button class="btn btn-light" onclick="copyLink()">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Socket.IO for real-time updates
+        const socket = io();
+        
+        socket.on('queue_update', function(data) {
+            location.reload();  // Simple reload for MVP
+        });
+
+        function copyLink() {
+            const input = document.getElementById('bookingLink');
+            input.select();
+            document.execCommand('copy');
+            alert('Link copied to clipboard!');
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+track.html
+<!-- templates/track.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Track Queue</h2>
+<p>Token: {{ queue.token }}</p>
+<p>Position: <span id="position">{{ queue.position }}</span></p>
+<p>Estimated Wait: {{ queue.estimated_wait }} mins</p>
+<p>Status: {{ queue.status }}</p>
+<script>
+    const socket = io();
+    socket.emit('join', {subdomain: '{{ subdomain }}'});
+    socket.on('queue_update', function(data) {
+        if (data.token === '{{ queue.token }}') {
+            document.getElementById('position').innerText = data.position;
+        }
+    });
+</script>
+{% endblock %}
+
+
+
+walkin.html
+<!-- templates/walkin.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Walk-in Token</h2>
+<form method="POST">
+    <div class="form-group">
+        <label>Service</label>
+        <select name="service" class="form-control">
+            {% for s in services %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Phone</label>
+        <input type="text" name="phone" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Get Token</button>
+</form>
+{% endblock %}
+
+
+
+book.html
+<!-- templates/book.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Book Appointment</h2>
+<form method="POST">
+    <div class="form-group">
+        <label>Service</label>
+        <select name="service" class="form-control">
+            {% for s in services %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Staff</label>
+        <select name="staff" class="form-control">
+            {% for st in staff %}
+            <option value="{{ st.id }}">{{ st.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Phone</label>
+        <input type="text" name="phone" class="form-control">
+    </div>
+    <div class="form-group">
+        <label>Time</label>
+        <input type="datetime-local" name="time" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Book</button>
+</form>
+{% endblock %}
+
+
+
+base.html
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Q-SMART{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+
+
+admin.html
+<!-- templates/admin.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Admin Panel</h2>
+<ul>
+    {% for t in tenants %}
+    <li>{{ t.name }} - <a href="{{ url_for('approve_tenant', tenant_id=t.id) }}">Approve</a></li>
+    {% endfor %}
+</ul>
+{% endblock %}
+
+
+
+
+add_staff.html
+<!-- templates/add_staff.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Add Staff</h2>
+<form method="POST">
+    <div class="form-group">
+        <label>Name</label>
+        <input type="text" name="name" class="form-control">
+    </div>
+    <div class="form-group">
+        <label>Schedule (JSON)</label>
+        <input type="text" name="schedule" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Add</button>
+</form>
+{% endblock %}
+
+
+
+add_service.html
+<!-- templates/add_service.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Add Service</h2>
+<form method="POST">
+    <div class="form-group">
+        <label>Name</label>
+        <input type="text" name="name" class="form-control">
+    </div>
+    <div class="form-group">
+        <label>Duration (mins)</label>
+        <input type="number" name="duration" class="form-control">
+    </div>
+    <div class="form-group">
+        <label>Price</label>
+        <input type="number" name="price" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Add</button>
+</form>
+{% endblock %}
+
+

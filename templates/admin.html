@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+{% block page_title %}Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon pink"><i class="bi bi-shop" style="color:var(--pink)"></i></div>
+      <div class="stat-value">{{ tenants|length }}</div>
+      <div class="stat-label">Total Businesses</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="bi bi-check-circle" style="color:#1B8A45"></i></div>
+      <div class="stat-value">{{ tenants|selectattr('approved')|list|length }}</div>
+      <div class="stat-label">Approved</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon orange"><i class="bi bi-clock" style="color:#C77800"></i></div>
+      <div class="stat-value">{{ tenants|rejectattr('approved')|list|length }}</div>
+      <div class="stat-label">Pending Approval</div>
+    </div>
+  </div>
+</div>
+
+<div class="data-table">
+  <div class="p-4 border-bottom" style="border-color:#f0eaf5">
+    <h5 style="font-family:'Syne',sans-serif;font-weight:700;margin:0">All Registered Businesses</h5>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Business</th>
+          <th>Type</th>
+          <th>Owner Email</th>
+          <th>Subdomain</th>
+          <th>Registered</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tenants %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td><strong>{{ t.name }}</strong></td>
+          <td>{{ t.business_type|replace('_',' ')|title if t.business_type else '—' }}</td>
+          <td>{{ t.owner_email }}</td>
+          <td><code>/book/{{ t.subdomain }}</code></td>
+          <td style="font-size:0.82rem;color:#6B5B72">{{ t.created_at.strftime('%d %b %Y') }}</td>
+          <td>
+            {% if t.approved %}
+              <span class="status-badge badge-confirmed">Approved</span>
+            {% else %}
+              <span class="status-badge badge-pending">Pending</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if not t.approved %}
+            <a href="{{ url_for('approve_tenant', tenant_id=t.id) }}" class="btn btn-sm btn-pink">Approve</a>
+            {% endif %}
+            
+            {% if not t.subscription_active %}
+            <a href="{{ url_for('activate_subscription', tenant_id=t.id) }}" class="btn btn-sm btn-warning">Activate Subscription</a>
+            {% endif %}
+            <a href="{{ url_for('delete_tenant', tenant_id=t.id) }}"
+            class="btn btn-sm btn-danger"
+            onclick="return confirm('Are you sure you want to delete this business? This cannot be undone.')">
+            Delete
+            </a>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

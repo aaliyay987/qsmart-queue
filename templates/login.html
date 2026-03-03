@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — QSmart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    :root { --pink:#FF2D6B; --pink-light:#FFE0EC; --pink-pale:#FFF5F9; }
+    body { font-family:'DM Sans',sans-serif; min-height:100vh; display:flex; background:linear-gradient(135deg,#FFF5F9 0%,#fff 50%,#FFF5F9 100%); }
+    .auth-left {
+      flex:1; background:var(--dark,#0D0A0F);
+      display:flex; flex-direction:column; justify-content:center; padding:60px;
+      position:relative; overflow:hidden;
+    }
+    .auth-left::before {
+      content:""; position:absolute; inset:0;
+      background:radial-gradient(ellipse 600px 600px at 80% 20%,rgba(255,45,107,0.15) 0%,transparent 60%);
+    }
+    .auth-right {
+      flex:0 0 480px; display:flex; flex-direction:column;
+      justify-content:center; padding:60px 50px; background:#fff;
+      box-shadow:-4px 0 40px rgba(0,0,0,0.06);
+    }
+    .auth-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.8rem; color:#fff; display:flex; align-items:center; gap:10px; margin-bottom:40px; z-index:1; position:relative; }
+    .auth-logo .logo-icon { background:var(--pink); width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+    .auth-logo span { color:var(--pink); }
+    .auth-tagline { font-size:2.2rem; font-family:'Syne',sans-serif; font-weight:800; color:#fff; line-height:1.2; margin-bottom:16px; z-index:1; position:relative; }
+    .auth-tagline span { color:var(--pink); }
+    .auth-sub { color:rgba(255,255,255,0.5); font-size:0.95rem; z-index:1; position:relative; }
+    .auth-bullets { list-style:none; padding:0; margin-top:32px; z-index:1; position:relative; }
+    .auth-bullets li { color:rgba(255,255,255,0.6); font-size:0.88rem; padding:6px 0; display:flex; align-items:center; gap:10px; }
+    .auth-bullets li::before { content:"✓"; background:var(--pink); color:#fff; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:900; flex-shrink:0; }
+    .auth-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1.8rem; color:#0D0A0F; margin-bottom:6px; }
+    .auth-subtitle { color:#6B5B72; font-size:0.9rem; margin-bottom:32px; }
+    .form-label { font-weight:600; font-size:0.85rem; color:#0D0A0F; }
+    .form-control { border:1.5px solid #e8e0f0; border-radius:12px; padding:12px 16px; font-size:0.9rem; transition:all 0.2s; }
+    .form-control:focus { border-color:var(--pink); box-shadow:0 0 0 3px rgba(255,45,107,0.1); outline:none; }
+    .btn-pink { background:var(--pink); color:#fff; border:none; border-radius:50px; padding:14px 32px; font-weight:700; font-size:0.95rem; width:100%; transition:all 0.2s; }
+    .btn-pink:hover { background:#e0265e; color:#fff; transform:translateY(-1px); box-shadow:0 8px 24px rgba(255,45,107,0.3); }
+    .auth-link { text-align:center; margin-top:20px; font-size:0.88rem; color:#6B5B72; }
+    .auth-link a { color:var(--pink); font-weight:600; text-decoration:none; }
+    .alert { border-radius:12px; border:none; font-size:0.85rem; }
+    .alert-danger { background:#FFE8E8; color:#C0392B; }
+    .alert-warning { background:#FFF8E1; color:#C77800; }
+    .alert-info { background:#E8F0FF; color:#1A56DB; }
+    @media(max-width:768px) { .auth-left { display:none; } .auth-right { flex:1; padding:40px 24px; } }
+  </style>
+</head>
+<body>
+  <div class="auth-left">
+    <div class="auth-logo">
+      <div class="logo-icon">⚡</div>
+      Q<span>Smart</span>
+    </div>
+    <div class="auth-tagline">Smart queues.<br/>Happy <span>customers.</span></div>
+    <p class="auth-sub">The all-in-one queue & appointment platform built for India's growing businesses.</p>
+    <ul class="auth-bullets">
+      <li>Real-time digital token system</li>
+      <li>WhatsApp & SMS notifications</li>
+      <li>Live analytics dashboard</li>
+      <li>QR code for walk-in customers</li>
+      <li>Zero hardware required</li>
+    </ul>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-title">Welcome back 👋</div>
+    <div class="auth-subtitle">Sign in to your QSmart dashboard</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} mb-3">{{ msg }}</div>
+      {% endfor %}{% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="mb-3">
+        <label class="form-label">Email Address</label>
+        <input class="form-control" type="email" name="email" placeholder="you@business.com" required autocomplete="email">
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Password</label>
+        <input class="form-control" type="password" name="password" placeholder="Your password" required>
+      </div>
+      <button type="submit" class="btn-pink btn">Sign In →</button>
+    </form>
+
+    <div class="auth-link mt-3">
+      Don't have an account? <a href="{{ url_for('signup') }}">Create free account</a>
+    </div>
+    <div class="auth-link">
+      <a href="{{ url_for('demo') }}">Try demo without login →</a>
+    </div>
+    <div class="auth-link">
+      <a href="{{ url_for('home') }}" class="back-home-link"><i class="bi bi-house"></i> Back to Home</a>
+    </div>
+  </div>
+</body>
+</html>

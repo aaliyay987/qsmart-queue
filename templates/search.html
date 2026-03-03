@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find a Business — QSmart</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --pink: #FF2D6B;
+  --pink-light: #FFE0EC;
+  --pink-pale: #FFF5F9;
+  --dark: #0D0A0F;
+  --text-sub: #6B5B72;
+  --border: rgba(255,45,107,0.15);
+  --shadow: 0 8px 40px rgba(255,45,107,0.12);
+  --radius: 20px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #fff;
+  padding: 120px 24px 60px;
+}
+
+h1,h2,h3 { font-family: 'Syne', sans-serif; }
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 60px;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.4rem;
+  text-decoration: none;
+  color: var(--dark);
+}
+.logo span { color: var(--pink); }
+
+.hero {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+.hero p {
+  color: var(--text-sub);
+}
+
+.search-box {
+  max-width: 650px;
+  margin: 40px auto;
+  display: flex;
+  gap: 12px;
+}
+
+.search-box input {
+  flex: 1;
+  padding: 16px;
+  border-radius: 50px;
+  border: 1.5px solid var(--border);
+}
+
+.search-box button {
+  padding: 16px 28px;
+  border-radius: 50px;
+  border: none;
+  background: var(--pink);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 50px;
+}
+
+.card {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: 0.3s;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow);
+}
+
+.subdomain {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-bottom: 18px;
+}
+
+.card-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-primary {
+  flex: 1;
+  padding: 12px;
+  border-radius: 50px;
+  background: var(--pink);
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.btn-outline {
+  flex: 1;
+  padding: 12px;
+  border-radius: 50px;
+  border: 1.5px solid var(--border);
+  color: var(--pink);
+  text-align: center;
+  text-decoration: none;
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="{{ url_for('home') }}" class="logo">⚡ Q<span>Smart</span></a>
+</div>
+
+<div class="hero">
+  <h1>Find Your Business</h1>
+  <p>Search and book instantly or join the walk-in queue.</p>
+</div>
+
+<form method="GET" action="{{ url_for('search_business') }}" class="search-box">
+  <input type="text" name="q" value="{{ query or '' }}" placeholder="Search business...">
+  <button type="submit">Search</button>
+</form>
+
+{% if results %}
+<div class="grid">
+{% for business in results %}
+<div class="card">
+  <h3>{{ business.name }}</h3>
+  <div class="subdomain">{{ business.subdomain }}.qsmart.com</div>
+  <div class="card-buttons">
+    <a href="{{ url_for('book', subdomain=business.subdomain) }}" class="btn-primary">Book</a>
+    <a href="{{ url_for('walkin', subdomain=business.subdomain) }}" class="btn-outline">Walk-in</a>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+</body>
+</html>

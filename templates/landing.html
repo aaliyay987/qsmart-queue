@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>QSmart — Smart Queue Management for Indian Businesses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --pink: #FF2D6B;
+  --pink-mid: #FF6B9D;
+  --pink-light: #FFE0EC;
+  --pink-pale: #FFF5F9;
+  --dark: #0D0A0F;
+  --dark2: #1A141F;
+  --text: #1A141F;
+  --text-sub: #6B5B72;
+  --border: rgba(255,45,107,0.15);
+  --shadow: 0 8px 40px rgba(255,45,107,0.12);
+  --shadow-lg: 0 24px 80px rgba(255,45,107,0.18);
+  --radius: 20px;
+  --radius-sm: 12px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text); overflow-x: hidden; line-height: 1.6; }
+h1, h2, h3, h4 { font-family: 'Syne', sans-serif; line-height: 1.1; }
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 60px; background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(20px); border-bottom: 1px solid var(--border);
+}
+.nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.5rem; color: var(--dark); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.nav-logo span { color: var(--pink); }
+.nav-logo .logo-icon { width: 36px; height: 36px; background: var(--pink); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.nav-links { display: flex; align-items: center; gap: 36px; list-style: none; }
+.nav-links a { text-decoration: none; color: var(--text-sub); font-weight: 500; font-size: 0.95rem; transition: color 0.2s; }
+.nav-links a:hover { color: var(--pink); }
+.nav-cta { background: var(--pink); color: #fff !important; padding: 10px 24px; border-radius: 50px; font-weight: 700 !important; font-size: 0.9rem !important; box-shadow: 0 4px 20px rgba(255,45,107,0.3); transition: all 0.2s !important; }
+.nav-cta:hover { background: #e0265e !important; transform: translateY(-1px); }
+.hero { min-height: 100vh; padding: 140px 60px 80px; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 800px 600px at 80% 20%, rgba(255,45,107,0.08) 0%, transparent 60%), radial-gradient(ellipse 600px 400px at 10% 80%, rgba(255,107,157,0.07) 0%, transparent 60%); pointer-events: none; }
+.hero::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,45,107,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,45,107,0.04) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+.hero-content { max-width: 900px; text-align: center; position: relative; z-index: 2; }
+.hero-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--pink-light); color: var(--pink); font-size: 0.8rem; font-weight: 700; padding: 8px 18px; border-radius: 50px; margin-bottom: 28px; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid rgba(255,45,107,0.2); }
+.hero-badge::before { content: "●"; color: var(--pink); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+.hero-title { font-size: clamp(2.8rem, 7vw, 5.5rem); font-weight: 800; letter-spacing: -2px; margin-bottom: 24px; }
+.hero-title .line-pink { display: block; background: linear-gradient(135deg, var(--pink) 0%, #FF8FB3 60%, var(--pink) 100%); background-size: 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 4s linear infinite; }
+@keyframes shimmer { 0%{background-position:0% 50%}100%{background-position:200% 50%} }
+.hero-sub { font-size: 1.2rem; color: var(--text-sub); max-width: 580px; margin: 0 auto 44px; font-weight: 300; line-height: 1.7; }
+.hero-sub strong { color: var(--pink); font-weight: 500; }
+.hero-actions { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 64px; }
+.btn-primary { background: var(--pink); color: #fff; padding: 16px 36px; border-radius: 50px; font-weight: 700; font-size: 1rem; text-decoration: none; box-shadow: 0 8px 30px rgba(255,45,107,0.35); transition: all 0.25s; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary:hover { transform: translateY(-3px); box-shadow: 0 14px 40px rgba(255,45,107,0.45); background: #e0265e; }
+.btn-secondary { background: #fff; color: var(--pink); padding: 16px 36px; border-radius: 50px; font-weight: 600; font-size: 1rem; text-decoration: none; border: 2px solid var(--border); transition: all 0.25s; display: inline-flex; align-items: center; gap: 8px; }
+.btn-secondary:hover { border-color: var(--pink); background: var(--pink-pale); transform: translateY(-3px); }
+.dashboard-mockup { width: 100%; max-width: 900px; background: #fff; border-radius: 24px; border: 1.5px solid var(--border); box-shadow: var(--shadow-lg); overflow: hidden; animation: float 7s ease-in-out 1.5s infinite; position: relative; z-index: 2; }
+@keyframes float { 0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)} }
+.mockup-bar { background: var(--dark); padding: 14px 20px; display: flex; align-items: center; gap: 8px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot-r{background:#FF5F56}.dot-y{background:#FFBD2E}.dot-g{background:#27C93F}
+.mockup-url { margin-left: 16px; background: rgba(255,255,255,0.1); border-radius: 6px; padding: 5px 14px; font-size: 0.78rem; color: rgba(255,255,255,0.5); font-family: monospace; }
+.mockup-body { display: grid; grid-template-columns: 200px 1fr; min-height: 380px; }
+.mockup-sidebar { background: var(--pink-pale); border-right: 1px solid var(--border); padding: 20px 0; }
+.sidebar-item { padding: 12px 20px; font-size: 0.85rem; font-weight: 500; color: var(--text-sub); display: flex; align-items: center; gap: 10px; }
+.sidebar-item.active { background: var(--pink-light); color: var(--pink); border-right: 3px solid var(--pink); }
+.mockup-main { padding: 24px; }
+.stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 20px; }
+.stat-card-m { background: var(--pink-pale); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.stat-label-m { font-size: 0.72rem; color: var(--text-sub); font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-value-m { font-family: 'Syne', sans-serif; font-size: 1.7rem; font-weight: 800; color: var(--dark); }
+.stat-value-m span { font-size: 0.85rem; color: var(--pink); font-weight: 600; }
+.queue-list { display: flex; flex-direction: column; gap: 8px; }
+.queue-item { display: flex; align-items: center; gap: 12px; background: #f9f9f9; border: 1px solid #eee; border-radius: 10px; padding: 10px 14px; font-size: 0.83rem; }
+.token-badge { background: var(--pink); color: #fff; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 0.8rem; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.queue-name { font-weight: 600; color: var(--dark); flex: 1; }
+.queue-wait { color: var(--text-sub); font-size: 0.78rem; }
+.queue-status { font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 50px; }
+.s-serving{background:#E8FFF0;color:#1B8A45}.s-waiting{background:#FFF5F9;color:var(--pink)}.s-next{background:#FFF8E1;color:#C77800}
+.badge-live { background: #E8FFF0; color: #1B8A45; font-size: 0.72rem; font-weight: 700; padding: 5px 12px; border-radius: 50px; display: flex; align-items: center; gap: 5px; }
+.badge-live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #27C93F; animation: pulse 1.5s infinite; }
+
+/* FEATURES SECTION */
+.features-section { padding: 100px 60px; background: var(--pink-pale); }
+.features-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; max-width: 1100px; margin: 0 auto; }
+.feat-card { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 36px 28px; transition: all 0.3s; }
+.feat-card:hover { border-color: rgba(255,45,107,0.3); transform: translateY(-8px); box-shadow: var(--shadow); }
+.feat-icon { width: 56px; height: 56px; background: var(--pink-light); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 20px; }
+.feat-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 10px; }
+.feat-desc { font-size: 0.88rem; color: var(--text-sub); line-height: 1.6; }
+
+/* STATS PINK */
+.stats-section { padding: 70px 60px; background: var(--pink); }
+.stats-inner { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(4,1fr); gap: 40px; text-align: center; }
+.stat-num { font-family: 'Syne', sans-serif; font-size: 3rem; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 8px; }
+.stat-lbl { color: rgba(255,255,255,0.75); font-size: 0.88rem; font-weight: 500; }
+
+/* FOOTER */
+footer { background: var(--dark); padding: 60px 60px 30px; color: rgba(255,255,255,0.5); }
+.footer-inner { max-width: 1100px; margin: 0 auto; }
+.footer-top { display: grid; grid-template-columns: 1.5fr repeat(3,1fr); gap: 60px; padding-bottom: 48px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 28px; }
+.footer-col h5 { font-family: 'Syne', sans-serif; color: #fff; font-weight: 700; font-size: 0.9rem; margin-bottom: 16px; }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.footer-col ul a { text-decoration: none; color: rgba(255,255,255,0.45); font-size: 0.85rem; transition: color 0.2s; }
+.footer-col ul a:hover { color: var(--pink); }
+.footer-bottom { display: flex; justify-content: space-between; font-size: 0.8rem; }
+
+/* PRICING */
+.pricing-section { padding: 100px 60px; background: var(--pink-pale); }
+.pricing-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; max-width: 1000px; margin: 0 auto; align-items: start; }
+.plan-card { background: #fff; border: 2px solid var(--border); border-radius: var(--radius); padding: 36px 28px; transition: all 0.3s; position: relative; }
+.plan-card.featured { border-color: var(--pink); box-shadow: var(--shadow-lg); transform: scale(1.04); }
+.plan-ribbon { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: var(--pink); color: #fff; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 16px; border-radius: 50px; white-space: nowrap; }
+.plan-price { font-family: 'Syne', sans-serif; font-size: 2.8rem; font-weight: 800; color: var(--dark); line-height: 1; margin: 8px 0; }
+.plan-features { list-style: none; margin-bottom: 28px; display: flex; flex-direction: column; gap: 10px; }
+.plan-features li { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; }
+.plan-features li::before { content: "✓"; width: 20px; height: 20px; background: var(--pink-light); color: var(--pink); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; flex-shrink: 0; }
+.plan-btn { display: block; text-align: center; padding: 14px; border-radius: 50px; font-weight: 700; font-size: 0.9rem; text-decoration: none; transition: all 0.25s; }
+.plan-btn-primary { background: var(--pink); color: #fff; box-shadow: 0 6px 20px rgba(255,45,107,0.3); }
+.plan-btn-primary:hover { background: #e0265e; transform: translateY(-2px); }
+.plan-btn-outline { border: 2px solid var(--border); color: var(--text); }
+.plan-btn-outline:hover { border-color: var(--pink); color: var(--pink); }
+.section-eyebrow { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--pink); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+.section-eyebrow::before { content: ""; display: block; width: 28px; height: 2px; background: var(--pink); border-radius: 2px; }
+.section-title { font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 800; letter-spacing: -1px; margin-bottom: 18px; }
+.section-sub { color: var(--text-sub); font-size: 1.05rem; font-weight: 300; line-height: 1.7; }
+
+/* CTA */
+.cta-section { padding: 120px 60px; background: var(--dark); text-align: center; position: relative; overflow: hidden; }
+.cta-section .section-title { color: #fff; }
+.cta-section .section-sub { color: rgba(255,255,255,0.5); max-width: 550px; margin: 0 auto 44px; }
+
+/* MARQUEE */
+.marquee-section { overflow: hidden; padding: 22px 0; background: var(--dark); }
+.marquee-track { display: flex; gap: 60px; animation: marquee 25s linear infinite; white-space: nowrap; }
+.marquee-item { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.1em; color: rgba(255,255,255,0.35); text-transform: uppercase; flex-shrink: 0; display: flex; align-items: center; gap: 16px; }
+.marquee-item::after { content: "★"; color: var(--pink); font-size: 0.7rem; }
+@keyframes marquee { from{transform:translateX(0)}to{transform:translateX(-50%)} }
+
+@media(max-width:900px) {
+  nav { padding: 16px 24px; }
+  .nav-links { display: none; }
+  .hero { padding: 100px 24px 60px; }
+  .features-grid, .pricing-grid { grid-template-columns: 1fr; }
+  .stats-inner { grid-template-columns: 1fr 1fr; }
+  .footer-top { grid-template-columns: 1fr 1fr; gap: 36px; }
+  .plan-card.featured { transform: none; }
+  .features-section, .pricing-section, .stats-section, .cta-section { padding: 70px 24px; }
+  footer { padding: 48px 24px 24px; }
+}
+</style>
+</head>
+<body>
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="logo-icon">⚡</div>Q<span>Smart</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="{{ url_for('demo') }}">Live Demo</a></li>
+    <li><a href="{{ url_for('login') }}">Login</a></li>
+    <li><a href="{{ url_for('search_business') }}">Search Business</a></li>
+    <li><a href="{{ url_for('signup') }}" class="nav-cta">Get Started Free →</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">🇮🇳 Made for India's Growing Businesses</div>
+    <h1 class="hero-title">
+      No More Chaotic Queues
+      <span class="line-pink">Manage. Scale. Delight.</span>
+    </h1>
+    <p class="hero-sub">
+      QSmart turns your walk-ins and appointments into a <strong>seamless digital experience</strong> — with real-time tokens, smart scheduling, and live analytics. Zero hardware. Starts in 5 minutes.
+    </p>
+    <div class="hero-actions">
+      <a href="{{ url_for('signup') }}" class="btn-primary">🚀 Start Free — No Card Needed</a>
+      <a href="{{ url_for('demo') }}" class="btn-secondary">▶ Try Live Demo</a>
+    </div>
+  </div>
+
+  <!-- Dashboard Mockup -->
+  <div class="dashboard-mockup">
+    <div class="mockup-bar">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span class="mockup-url">app.qsmart.in/dashboard</span>
+    </div>
+    <div class="mockup-body">
+      <div class="mockup-sidebar">
+        <div class="sidebar-item active">📊 Dashboard</div>
+        <div class="sidebar-item">🎟️ Tokens</div>
+        <div class="sidebar-item">📅 Appointments</div>
+        <div class="sidebar-item">👥 Customers</div>
+        <div class="sidebar-item">📈 Analytics</div>
+      </div>
+      <div class="mockup-main">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <strong>Live Queu
+            e Overview</strong>
+          <span class="badge-live">LIVE</span>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card-m"><div class="stat-label-m">Active Tokens</div><div class="stat-value-m">24 <span>↑4</span></div></div>
+          <div class="stat-card-m"><div class="stat-label-m">Appts Today</div><div class="stat-value-m">37</div></div>
+          <div class="stat-card-m"><div class="stat-label-m">Avg Wait</div><div class="stat-value-m">12 <span>min</span></div></div>
+        </div>
+        <div class="queue-list">
+          <div class="queue-item"><div class="token-badge">A01</div><span class="queue-name">Rajan Mehta</span><span class="queue-wait">0 min</span><span class="queue-status s-serving">Serving</span></div>
+          <div class="queue-item"><div class="token-badge">A02</div><span class="queue-name">Priya Sharma</span><span class="queue-wait">8 min</span><span class="queue-status s-next">Up Next</span></div>
+          <div class="queue-item"><div class="token-badge">A03</div><span class="queue-name">Anil Kumar</span><span class="queue-wait">16 min</span><span class="queue-status s-waiting">Waiting</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-section">
+  <div class="marquee-track">
+    <span class="marquee-item">Salons &amp; Parlours</span>
+    <span class="marquee-item">Clinics &amp; Hospitals</span>
+    <span class="marquee-item">Service Centres</span>
+    <span class="marquee-item">Government Offices</span>
+    <span class="marquee-item">Coaching Institutes</span>
+    <span class="marquee-item">CA Offices</span>
+    <span class="marquee-item">Pharma Counters</span>
+    <span class="marquee-item">Auto Repair Shops</span>
+    <span class="marquee-item">Salons &amp; Parlours</span>
+    <span class="marquee-item">Clinics &amp; Hospitals</span>
+    <span class="marquee-item">Service Centres</span>
+    <span class="marquee-item">Government Offices</span>
+    <span class="marquee-item">Coaching Institutes</span>
+    <span class="marquee-item">CA Offices</span>
+    <span class="marquee-item">Pharma Counters</span>
+    <span class="marquee-item">Auto Repair Shops</span>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="features-section" id="features">
+  <div style="text-align:center;margin-bottom:56px">
+    <div class="section-eyebrow" style="justify-content:center">What You Get</div>
+    <h2 class="section-title">Everything your business needs</h2>
+  </div>
+  <div class="features-grid">
+    <div class="feat-card"><div class="feat-icon">📱</div><div class="feat-title">QR Token System</div><p class="feat-desc">Customers scan a QR and get a digital token — no app needed. They wait anywhere and track their position live.</p></div>
+    <div class="feat-card"><div class="feat-icon">📅</div><div class="feat-title">Online Appointments</div><p class="feat-desc">Customers book 24/7 from any device. Auto-confirmations and reminders via WhatsApp + SMS.</p></div>
+    <div class="feat-card"><div class="feat-icon">📊</div><div class="feat-title">Live Analytics</div><p class="feat-desc">Peak hours, avg service time, staff performance, daily reports — all in real time.</p></div>
+    <div class="feat-card"><div class="feat-icon">🔔</div><div class="feat-title">WhatsApp & SMS Alerts</div><p class="feat-desc">Auto-send token updates and turn notifications. Reduce no-shows by up to 60%.</p></div>
+    <div class="feat-card"><div class="feat-icon">👥</div><div class="feat-title">Multi-Staff Management</div><p class="feat-desc">Manage multiple service counters, assign staff, split queues by service type.</p></div>
+    <div class="feat-card"><div class="feat-icon">🇮🇳</div><div class="feat-title">India-Ready</div><p class="feat-desc">UPI links in reminders, multi-language support, GST-ready invoices, India-hosted data.</p></div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats-section">
+  <div class="stats-inner">
+    <div><div class="stat-num">10K+</div><div class="stat-lbl">Businesses Trust QSmart</div></div>
+    <div><div class="stat-num">1M+</div><div class="stat-lbl">Tokens Generated</div></div>
+    <div><div class="stat-num">99.9%</div><div class="stat-lbl">Platform Uptime</div></div>
+    <div><div class="stat-num">4.8★</div><div class="stat-lbl">Average User Rating</div></div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing-section" id="pricing">
+  <div style="text-align:center;margin-bottom:56px">
+    <div class="section-eyebrow" style="justify-content:center">Simple Pricing</div>
+    <h2 class="section-title">Honest prices for Indian businesses</h2>
+  </div>
+  <div class="pricing-grid">
+    <div class="plan-card">
+      <div style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-sub);margin-bottom:10px">Starter</div>
+      <div class="plan-price">₹0</div>
+      <div style="font-size:0.83rem;color:var(--text-sub);margin-bottom:28px">Forever free · 1 counter</div>
+      <ul class="plan-features">
+        <li>Up to 50 tokens/month</li>
+        <li>Basic appointment booking</li>
+        <li>QR token system</li>
+        
+      </ul>
+      <a href="{{ url_for('signup') }}" class="plan-btn plan-btn-outline">Get Started Free</a>
+    </div>
+    <div class="plan-card featured">
+      <div class="plan-ribbon">🔥 Most Popular</div>
+      <div style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-sub);margin-bottom:10px">Growth</div>
+      <div class="plan-price">₹999</div>
+      <div style="font-size:0.83rem;color:var(--text-sub);margin-bottom:28px">per month · Up to 5 counters</div>
+      <ul class="plan-features">
+        <li>Unlimited tokens & appointments</li>
+        <li>WhatsApp + SMS alerts</li>
+        <li>Multi-staff management</li>
+        <li>Advanced analytics</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="{{ url_for('signup') }}" class="plan-btn plan-btn-primary">Start 14-Day Trial →</a>
+    </div>
+    <div class="plan-card">
+      <div style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-sub);margin-bottom:10px">Enterprise</div>
+      <div class="plan-price" style="font-size:2rem">Custom</div>
+      <div style="font-size:0.83rem;color:var(--text-sub);margin-bottom:28px">For large chains & franchises</div>
+      <ul class="plan-features">
+        <li>Unlimited counters & locations</li>
+        <li>Dedicated account manager</li>
+        <li>API & ERP integration</li>
+        <li>Custom features & SLA</li>
+      </ul>
+      <a href="#" class="plan-btn plan-btn-outline">Talk to Sales</a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="section-eyebrow" style="justify-content:center;color:rgba(255,255,255,0.6)">Ready?</div>
+  <h2 class="section-title">Start delighting your customers today — for free</h2>
+  <p class="section-sub">Join 10,000+ Indian businesses already using QSmart. No credit card. No hardware.</p>
+  <div class="hero-actions">
+    <a href="{{ url_for('signup') }}" class="btn-primary">🚀 Create Free Account</a>
+    <a href="{{ url_for('demo') }}" class="btn-primary" style="border-color:rgba(255,255,255,0.2);color:#fff">▶ Try Demo First</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div>
+        <a href="#" class="nav-logo" style="color:#fff;margin-bottom:14px">
+          <div class="logo-icon">⚡</div>Q<span style="color:var(--pink)">Smart</span>
+        </a>
+        <p style="font-size:0.85rem;line-height:1.6;margin-top:14px">Smart Queue Management for India's growing businesses. Made with ❤️ in India.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Product</h5>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="{{ url_for('demo') }}" class="btn btn-pink">Live Demo</a></li>
+          <li><a href="{{ url_for('search_business') }}" class="btn btn-pink">Find Business</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Account</h5>
+        <ul>
+          <li><a href="{{ url_for('login') }}">Login</a></li>
+          <li><a href="{{ url_for('signup') }}">Sign Up Free</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Support</h5>
+        <ul>
+          <li><a href="#">Help Center</a></li>
+          <li><a href="#">WhatsApp Support</a></li>
+          <li><a href="#">Privacy Policy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2025 QSmart. All rights reserved.</span>
+      <span>Built for Bharat 🇮🇳</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
