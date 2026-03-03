@@ -3,7 +3,7 @@
 import os
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'super-secret-key-please-change-this-in-production'
+    SECRET_KEY = os.environ.get('25437c39ce5543d7376035c0f1f9940d') 
     
     # Use your REAL Supabase/Neon PostgreSQL URL here!
     # Example from Supabase: postgresql://postgres:[YOUR_PASSWORD]@db.yourprojectref.supabase.co:5432/postgres

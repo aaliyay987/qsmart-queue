@@ -34,7 +34,7 @@ init_socket_events()
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(int(user_id))
+    return db.session.get(Tenant,int(user_id))
 
 
 # ============================================
