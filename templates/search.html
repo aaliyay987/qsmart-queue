@@ -139,12 +139,28 @@ h1,h2,h3 { font-family: 'Syne', sans-serif; }
   text-decoration: none;
   font-weight: 600;
 }
+.back-btn {
+  text-decoration: none;
+  padding: 10px 22px;
+  border-radius: 50px;
+  border: 1.5px solid var(--border);
+  color: var(--pink);
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.back-btn:hover {
+  background: var(--pink-light);
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
   <a href="{{ url_for('home') }}" class="logo">⚡ Q<span>Smart</span></a>
+  
+  <a href="{{ url_for('home') }}" class="back-btn">← Back to Home</a>
+</div>
 </div>
 
 <div class="hero">
@@ -166,8 +182,10 @@ h1,h2,h3 { font-family: 'Syne', sans-serif; }
   <div class="card-buttons">
     <a href="{{ url_for('book', subdomain=business.subdomain) }}" class="btn-primary">Book</a>
     <a href="{{ url_for('walkin', subdomain=business.subdomain) }}" class="btn-outline">Walk-in</a>
+        
   </div>
 </div>
+
 {% endfor %}
 </div>
 {% endif %}
